@@ -4,7 +4,7 @@ author: "Kevin E. D'Elia"
 date: "July 11, 2016"
 output: 
   html_document: 
-    highlight: tango
+    highlight: zenburn
     theme: cerulean
 ---
 
@@ -188,3 +188,65 @@ j <- levels(batting$teamID)
 batting$lower <- batting$teamID %in% j[1:15]
 with(batting, CrossTable(x = lower, y = lgID))
 ```
+
+## Understanding nearest neighbor classification
+
+In a single sentence, *nearest neighbor* classifiers are defined by their characteristic of classifying unlabeled examples by assigning them the class of similar labeled examples.  In general, nearest neighbor classifiers are well-suited for classification tasks where relationships among the features and the target classes are numerous, complicated, or extremely difficult to understand, yet the items of similar class type tend to be fairly homogeneous.  If a concept is difficult to define, but you know it when you see it, k-NN might be appropriate.  but, if the data is noisy and thus no clear distinctino exists among the groups, the k-NN algorithm may struggle.
+
+### k-NN algorithm
+
+#### Strengths
+
+* simple and effective
+* makes no assumptions about the underlying data distributino
+fast training phase
+
+#### Weaknesses
+
+* does not produce a model, limiting the ability to understand how the features are related to the class
+* requires selection of an appropriate _k_
+* slow classificatino phase
+* nominal features and missing data require additional processing
+
+The k-NN algorithm gets its name from the fact that it uses information about an example's k-nearest neighbors to classify unlabeled examples.  The letter _k_ is a variable term implying that any number of nearest neighbors could be used.  After choosing _k_, the algorithm requires a training dataset made up of examples that have been classified into several categories, as labeled by a nominal variable.  Then, for each unlabeled (i.e., unclassified) record in the test dataset, k-NN identifies _k_ records in the training data that are the "nearest" in similarity.  The unlabeled test instance is assigned the class of the majority of the k nearest neighbors.
+
+A scatterplot could be used for two-dimensional data, such as x = how sweet and y = how crunchy.  The scatterplot may show groupings of the data, especially if plotted with label names (so all the protein-based foods appear in one cluster, etc.).
+
+### Measuring similarity with distance
+
+Locating the tomato's nearest neighbors requires a *distance function*, or a formula that measures the similarity between the two instances.
+
+Traditionally, the k-NN algorithm uses *Euclidean distance*, which is the distance one would measure if it were possible to use a ruler to connect two points.  The _dist()_ function in *R* is helpful for this (q.v., ?dist)
+
+dist(_p,q_) = $\sqrt(p_1 - q_1) ^ 2 + (p_2 - q_2) + ... + (p_n - q_n)$
+
+You calcluate the distance between the tomato and the green bean.  The tomato has a crunchiness and a sweetness rating, those are the _p_ values, while the green bean has its own values; those are the _q_ values.  Plug them in for green bean and other examples to produce a column in the matrix with the results of the distance measurements.  when you are done, you classify the tomato based on the food type of its single nearest neighbor.  This is called *1-NN classification* because k=1.  If you use k=3, it will take a vote from amongst the 3 nearest neighbors to arrive at a classification.
+
+### Choosing an appropriate k
+The decision of how many neighbors to use for k-NN determines how well the model will generalize to future data.  The balance between overfitting and underfitting the training data is a problem known as *bias-variance tradeoff*.  Choosing a large _k_ reduces the inmpact of variance caused by nooisy data, but can bias the learner so that it runs the risk of ignoring small but important patterns.
+
+In practice, choosing _k_ depends on the difficulty of the concept to be learned, and the number of records in the training data.  One common practice is to begin with _k_ equal to the square root of the number of training examples.
+
+An alternative approach is to test several _k_ values on a variety of test datasets and choose the one that delivers the best classification performance.
+
+### Preparing data for use with k-NN
+
+Features are typically transformed to a standard range prior to applying the k-NN algorithm.  This is because the distance formula is highly dependent on how features are measured.  If certain features have a much larger range of values than the others, the distance measurements will be strongly dominated by the features with the larger ranges.  So, if we add the Scoville scale (a standard spiciness measurement) as one of the features, its range is 0-$10^6$ and so it's affect would overwhelm the effects of the other features.
+
+The solution is to rescale the features by shrinking or expanding their range such tat each one contributes relatively equally to the distance formula.  So, we would make the spiciness range go from 1 to 10 in this case.
+
+The traditional method of rescaling features for k-NN is *min-max normalization*.  This process transforms a feature such that all of its values fall in a range between - and 1.  The formula for normalizing a feature is:
+
+$X_new$ = X - min(X)/ max(X) - min(X)
+
+Normalized feature values can be interpreted as indicating how far, from 0 percent to 100 percent, the original value fell along the range between the original minimum and maximum.
+
+Another common transofrmation is called *z-score standardization*.  
+
+$X_new = X - \mu / \sigma$ = X - Mean(X)/StdDev(X)
+
+This rescales each of the feature's values in terms of how many standard deviatinos they fall above or below the mean value.  The resulting value is called a *z-score*.  The z-scores fall in an unbounded range of negative and positive numbers.  Unlike normalized values, they have no predefined minimum and maximum.
+
+*Note:* The same rescaling method used on the k-NN training dataset must also be applied to the examples the algorithm will later classify.  The min-max of examples may have values outside the range observed in training data; find reasonable constants for the formula rather than the observed values.  Alternatively, use the z-score standardization
+
+The Euclidean distance formula is not defined for nominal data.  Therefore, to calculate the distance between nominal features, we need to convert them into a numeric format utilizing *dummy coding*, where a value of 1 indicates one category and 0 another.  An _n_-category nominal feature can be dummy coded by creating the binary indicator variable for (_n - 1_) levels of the feature.  For example, the dummy coding for a three-category temperature variable (hot, medium, cold) could be set up as 2 features (hot = 1/0, medium = 1/0, cold would be both of these = 0, no need for separate cold dummy variable)
