@@ -1,0 +1,190 @@
+---
+title: "Baseball Statistics Analysis"
+author: "Kevin E. D'Elia"
+date: "July 11, 2016"
+output: 
+  html_document: 
+    highlight: tango
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="./figures/")
+```
+
+## Executive Summary
+What is the purpose of this analysis?  What question are you trying to answer?
+
+## Pre-requisites/Assumptions
+Before working with this dataset, it is assumed that the following pre-requisites are met:
+
+1. The *UsingR* package has been installed using _install.packages()_ or similar method
+2. The *UsingR* library has been loaded using the _library(UsingR)_ command
+3. The dataset *batting* has been loaded into the working session using the _data("batting")_ command
+
+```{r load_data, echo= FALSE}
+suppressMessages(library(UsingR))
+library(UsingR)
+data("batting")
+```
+
+## Exploring the structure of data
+```{r structure}
+str(batting)
+```
+
+Since the data is for the year 2002 only, we can remove that column from our dataset and save it either in a new dataset, overwrite the existing dataset, or backup the original data prior to overwrite, or just overwrite and reload from the UsingR package.  We'll overwrite for now.
+```{r overwrite}
+batting <- batting[ , -c(2:3)]
+```
+
+### Exploring numeric variables
+
+The five-number summary is a set of five statistics (actually, six, since R gives the mean as well!) that roughly depict the spread of a variable's values.
+
+```{r summary_date}
+summary(batting$SO)
+```
+
+### Measuring the Central Tendency - Mean and Median
+Measures of Central Tendency are a class of statistics used to identify a value that falls in the middle of a set of data. 
+```{r mean_median}
+mean(batting$SO)
+median(batting$SO)
+```
+
+What does the mean you calculate tell you about your data?  Have to form some kind of hypothesis.
+The median is halfway between all the data points - what does that tell you?
+
+How do the mean and the median compare for the variable you've chosen?
+The mean and the median are affected differently by values falling at the far ends of the range.  Mean is particularly sensitive to outliers - values atypically high or low in relation to the majority of the data.  Because the mean is sensitive to outliers, it is more likely to be shifted higher or lower by a small number of extreme values.
+
+### Measuring spread - quartiles and the five-number summary
+
+Measuring the mean and the median provides one way to quickly summarize the values, but they don't tell much about whether or not there is diversity in the measurements.
+```{r range}
+range(batting$SO)
+diff(range(batting$SO))
+summary(batting$SO)
+```
+
+Q1 : point at which 25% of values fall below
+Q3 : point at which 25% of values lie above
+```{r IQR}
+IQR(batting$SO)
+```
+
+```{r quantiles}
+quantile(batting$SO)
+quantile(batting$SO, probs = c(0.01, 0.99))
+quantile(batting$SO, seq(from = 0, to = 1, by = 0.2))
+```
+
+Look at differences between min and Q1 and max and Q3.  This will help describe how the lower and upper 25% differ from the middle 50%
+Also, look at the min/Q1, max/Q3 differences; which difference is greater?  The one with the greater difference will have values more spread out.
+This will explain why the mean is greater than/less than the median.  It get pulled to the right for high values towards max and to the left for low values towards min.
+
+### Visualizing numeric variables - boxplots
+
+Displays the center and spread of a numeric variable 
+```{r boxplot}
+boxplot(SO ~ lgID, data = batting, col = "wheat", main = "Strikeouts by League", names = c("American\nLeague", "National\nLeague"), ylab = "Strikeouts", las = 1, border = "grey")
+```
+
+The box-and-whiskers plot depicts the five-number summary values . min, q1/q2 (median)/q3, max
+The whiskers can extend to a min or max of 1.5 * IQR below Q1 or above Q3; any values beyond this threshold are considered outliers.
+Explain the outliers you see in your boxplots, specifically, how their presence or absence affects the mean calculation.
+
+### Visualizing numeric variables - histograms
+
+Create a histogram of strikeouts
+```{r histogram}
+hist(batting$SO, col = "light blue", border = "dark blue", main = "Strikeout Frequencies", xlab = "Strikeouts (2002)", ylab = "Player Count", las = 1)
+```
+
+describe the histogram results
+The player count is the number of players that struck out within each of the ranges (0-20, etc.)  Knowing the total number of players gives percentages, i.e., x percent of all players had strikeouts within range Y.  also, talk about the skew of the histogram - this one is right-skewed, meaning it has outliers to the right of the data.  values on the high end are far more spread out than the values on the low end left side.
+
+### Understanding numeric data - uniform and normal distributions
+
+A variable's distribution describes how likely a value is to fall within various ranges.  Is the data you are working with uniform or normal or neither?
+
+### Measuring spread - variance and standard deviation
+
+Distributions allow us to characterize a large number of values using a smaller number of parameters.  The normal distribution can be defined with just two:  center and spread.  Center = mean, spread = standard deviation.
+
+$\sigma^2 = {\frac{1}{N}\sum\limits_{i = 1}^N {\left( {x_i - \bar x} \right)^2 } }$
+
+$\sigma = \sqrt {\frac{1}{N}\sum\limits_{i = 1}^N {\left( {x_i - \bar x} \right)^2 } }$
+
+While interpreting variance, larger numbers indicate that the data are spread more widely around the mean.  The standard deviation indicates, on average, how much each value differs from the mean.
+```{r variance}
+var(batting$SO)
+sd(batting$SO)
+```
+The standard deviation can be used to quickly estimate how extreme a given value is under the assumption that it came from a normal distribution.  Use the *68-95-99.7* rule (1, 2, 3 sd from the mean).  So, 68% of the strikeouts were blah, blah but this is not a normal distribution.
+
+```{r qqplot}
+qqnorm(batting$SO)
+qqline(batting$SO)
+```
+
+## Exploring categorical variables
+
+In contrast to numeric variables, categorical variables are typically examined using tables rather than summary statistics.  A table that presents a single categorical variable is called a *one-way table*.  The _table()_ function is used for this purpose.
+```{r table}
+table(batting$teamID)
+```
+
+The _table()_ output lists the categories of nominal variables and a count of the number of values in each category.  Since we know that there are `r nrow(batting)` teams, we can estimate percentages of players per team.  Or, the _prop.table()_ function can be used for this purpose:
+```{r proportions}
+prop.table(table(batting$teamID))
+```
+
+Clearly, this are hard-to-read results.  This approach produces a more pleasing output:
+```{r rounded}
+teams <- table(batting$teamID)
+teams.pct <- prop.table(teams) * 100
+round(teams.pct, 1)
+```
+
+We can then figure out which teams are most/least represented in this data.
+
+### Measuring the central tendency - the mode
+
+In statistics terms, the mode of a feature is the value occurring most often.  There is *unimodal*, *bimodal*, and *multimodal* data.  The _table()_ function is used to calculate the mode for categorical variables.  The *mean* and the *median* are not defined for nominal variables.
+
+What is the mode for this dataset?
+
+The mode or modes are used in a qualitative sense to gain an understanding of important values.  The common value is not necessarily a majority.  Black car might be most common for the color variable but they were only a quarter of the available data.  Think about modes in relation to the other categories.  Is there one or several which dominate?  What does that tell us about the variable being measured.
+
+## Exploring relationships between variables
+
+Calculations so far have been for *univariate* data.  There are also *bivariate* and *multivariate* data.  To do that, scatterplots are used.
+
+### Visualizing relationships - scatterplots
+
+A *scatterplot* is a digaram that visualizes _bivariate_ relationships.
+```{r scatterplots}
+with(batting, plot(x = teamID, y = SO))
+with(batting, plot(x = AB, y = SO))
+```
+
+Can the categorical scatterplot be improved? What relationship does the plot show?  Are there outliers that indicate some unusual indications, like high at-bats and low strikeouts (more than what's in the trend).  This is a positive trend, while there are negative trends.  A flat line or seemingly random scattering of dots, is evidence that the two variables are not associated at all.  The strength of a linear association between two variables is measured by correlation.
+```{r correlation}
+with(batting, round(cor(AB, SO), 2))
+```
+
+### Examining relationships - two-way cross-tabluations
+
+To examine a relationship between two nominal variables, *two-way cross-tabulation* (also known as a *crosstab* or *contingency table*).  A cross-tabulation is similar to a scatterplot in that it allows you to examine how the values of one variable vary by the values of another.  The format is a table in which the rows are the levels of one variable, while the columns are the levels of another.  Counts in each of the table's cells indicate the number of values falling into the particular row and column combination.
+
+Some times the number of levels in one variable need to be reduced.  In the case of the batting data, there are `r length(levels(batting$teamID))` levels!
+You have to identify some way of grouping the variables.  This can be done using a binary indicator variable (often called a *dummy variable*), indicating which of two groups members of the category fall into.  In this case, the levels will be split into two groups of 15 levels each.
+
+```{r gmodels}
+library(gmodels)
+j <- levels(batting$teamID)
+batting$lower <- batting$teamID %in% j[1:15]
+with(batting, CrossTable(x = lower, y = lgID))
+```
