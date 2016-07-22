@@ -33,6 +33,7 @@ data("batting")
 str(batting)
 ```
 
+The data for this study is part of the UsingR package but the original source of the data is [here](http://www.seanlahman.com/baseball-archive/statistics/).
 Since the data is for the year 2002 only, we can remove that column from our dataset and save it either in a new dataset, overwrite the existing dataset, or backup the original data prior to overwrite, or just overwrite and reload from the UsingR package.  We'll overwrite for now.
 ```{r overwrite}
 batting <- batting[ , -c(2:3)]
@@ -250,3 +251,122 @@ This rescales each of the feature's values in terms of how many standard deviati
 *Note:* The same rescaling method used on the k-NN training dataset must also be applied to the examples the algorithm will later classify.  The min-max of examples may have values outside the range observed in training data; find reasonable constants for the formula rather than the observed values.  Alternatively, use the z-score standardization
 
 The Euclidean distance formula is not defined for nominal data.  Therefore, to calculate the distance between nominal features, we need to convert them into a numeric format utilizing *dummy coding*, where a value of 1 indicates one category and 0 another.  An _n_-category nominal feature can be dummy coded by creating the binary indicator variable for (_n - 1_) levels of the feature.  For example, the dummy coding for a three-category temperature variable (hot, medium, cold) could be set up as 2 features (hot = 1/0, medium = 1/0, cold would be both of these = 0, no need for separate cold dummy variable)
+
+### Why is the k-NN algorithm lazy?
+
+Classification algorithms based on the nearest neighbor methods are considered *lazy learning* algorithms because, technically speaking, no abstraction occurs.  The abstraction and generalization processes are skipped altogether.  A lazy learner is not really learning anything; instead, it merely stores the training data verbatim. Lazy learning is also known as *instance-based learning* or *rote learning*. 
+
+As instance-based learners do not build a model, the methid is said to be in a class of *non-paramterc* learning methods - no parameters are learned about the data.  Without generating theories about the underlying data, non-parametric methods limit our ability to understand how the classifier is using the data.  On the other hadn, this allows the learner to find natural patterns rather than trying to fit the data into a preconceived and potentially biased functional form.
+
+## Example - diagnosing breast cancer with the k-NN algorithm
+
+We will investigate the utility of machine learning for detecing cancer by applying the k-NN algorithm to measurements of biopsied cells from woemn with abnormal breast masses.
+
+### Step 1 - collecting data
+
+```{r data_collection}
+#URL <- "http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data"
+#download.file(URL, destfile = "./data/wdbc.data.csv", method="curl")
+```
+
+5. Number of instances: 569 
+
+6. Number of attributes: 32 (ID, diagnosis, 30 real-valued input features)
+
+7. Attribute information
+
+1) ID number
+2) Diagnosis (M = malignant, B = benign)
+3-32)
+
+Ten real-valued features are computed for each cell nucleus:
+
+	a) radius (mean of distances from center to points on the perimeter)
+	b) texture (standard deviation of gray-scale values)
+	c) perimeter
+	d) area
+	e) smoothness (local variation in radius lengths)
+	f) compactness (perimeter^2 / area - 1.0)
+	g) concavity (severity of concave portions of the contour)
+	h) concave points (number of concave portions of the contour)
+	i) symmetry 
+	j) fractal dimension ("coastline approximation" - 1)
+
+### Step 2 - exploring and preparing the data
+
+```{r readin_data}
+setwd("/Users/kevindelia/Development/MachineLearningWithR/data")
+wbcd <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
+# examine the structure of the wbcd data frame
+str(wbcd)
+
+# drop the id feature
+wbcd <- wbcd[-1]
+```
+
+Regardless of the machine learning method, ID variables should always be excluded.  Neglecting to do so can lead to erroneous findings beccause the ID can be used to uniquely "predict" each example.  Therefore, a model that includes an identifier will suffer from overfitting, and is unlikely to generalize well to other data.
+
+Diagnosis is of particular interest as it is the outcome that is to be predicted.
+```{r diagnosis_table}
+# table of diagnosis
+table(wbcd$diagnosis)
+```
+
+Many R machine learning classifiers require that the target feature is coded as a factor.  Give the diagnosis value more informative labels:
+```{r relabel}
+# recode diagnosis as a factor
+wbcd$diagnosis <- factor(wbcd$diagnosis, levels = c("B", "M"), labels = c("Benign", "Malignant"))
+```
+
+Now use _prop.table()_ to get percentages:
+
+```{r percent_diagnosis}
+# table or proportions with more informative labels
+round(prop.table(table(wbcd$diagnosis)) * 100, digits = 1)
+```
+
+The remaining 30 features are all numeric and are different measurements of ten characteristics.  Taking a closer look at three of these features:
+```{r feature_summary}
+# summarize three numeric features
+summary(wbcd[c("radius_mean", "area_mean", "smoothness_mean")])
+```
+
+Since the range of *smoothness* is much different than that of *area*, the impact of area is going to be much larger than the smoothness in the distance calculation.  Normalization will rescale the features to a standard range of values to avoid problems for the classifier.
+
+### Transformation - normalizing numeric data
+
+Create a normalize function that matches the formula given above:
+```{r normalize}
+# create normalization function
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+```
+
+Now use _lapply()_ to work on our data
+```{r standardize}
+# normalize the wbcd data
+wbcd_n <- as.data.frame(lapply(wbcd[2:31], normalize))
+
+# confirm that normalization worked
+summary(wbcd_n$area_mean)
+```
+
+### Data preparation - creating training and test datasets
+
+Although all 569 biopsies are labeled with a benign or malignant status, it is not very interesting to predict what we already know.  Additionally, any performance measures we obtain during the training may be misleading as we do not know the extent to which cases have been overfitted or how well the learner will generalize to unseen cases.  A more interesting question is how well our learner performs on a dataset of unlabeled data.
+
+In the absence of such data, we can simulate this scencario by dividing our data into two portions:  a training dataset that will be used to build the k-NN model and a test dataset that will be used to estimate the predictive accuracy of the model.
+```{r splitdata}
+# create training and test data
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+```
+
+The nornalized dataset excluded column 1 *diagnosis*.  For training the k-NN model, we will need to store these class labels in factor vectors.  The following code takes the *diagnosis* factor in the first column of the _wbcd_ data frame, and this data will be used in the next steps of training and evaluating the classifiers.
+
+```{r labeldata}
+# create labels for training and test data
+wbcd_train_labels <- wbcd[1:469, 1]
+wbcd_test_labels <- wbcd[470:569, 1]
+```
