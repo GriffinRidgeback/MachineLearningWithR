@@ -1,0 +1,69 @@
+---
+title: "Adult Income Analysis"
+author: "Kevin E. D'Elia"
+date: "October 2nd, 2016"
+output:
+  html_document:
+    highlight: zenburn
+    theme: cosmo
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="./figures/")
+```
+
+# Executive Summary
+The purpose of this analysis is to predict whether income exceeds $50K/yr based on census data. Also known as "Census Income" dataset.
+
+# Pre-requisites/Assumptions
+Before working with this dataset, it is assumed that the following pre-requisites are met:
+
+1. The dataset **adult.data.csv** has been loaded
+2. The fields are comma-separated and there is no header
+3. Variable names must be taken from the data dictionary and applied to the data
+
+# Exploring and understanding data
+```{r load_training_data}
+adultData <- read.table("./Adult/adult.data", sep = ",", header = FALSE)
+names(adultData) <- c("age", "workclass", "fnlwgt", "education", "education_num", "marital_status", "occupation", "relationship", "race", "sex", "capital_gain", "capital_loss", "hours_per_week", "native_country", "income_level")
+dim(adultData)
+```
+
+Now read in the test data, ignoring the first row (skip = 1) as it is garbage data, and remove the last column ("income_level"), since that is the column we are trying to predict:
+```{r load_testing_data}
+adultTest <- read.table("./Adult/adult.test", sep = ",", header = FALSE, skip = 1)
+names(adultTest) <- c("age", "workclass", "fnlwgt", "education", "education_num", "marital_status", "occupation", "relationship", "race", "sex", "capital_gain", "capital_loss", "hours_per_week", "native_country", "income_level")
+adultTest <- adultTest[, -15]
+dim(adultTest)
+```
+
+## Exploring the structure of data
+The data dictionary informs us that both datasets contain identically named variables; the datasets vary in the number of observations provided.
+
+What is the structure of the data we are working with?
+```{r structure}
+str(adultData)
+str(adultTest)
+```
+
+## Exploring numeric variables
+
+The structure of the data identifies several variables that are numeric in nature; use the **summary** command to explore them:
+```{r summary}
+summary(adultData[c("age", "education_num", "capital_gain", "capital_loss")])
+```
+
+It looks as if the **capital_gain** variable has some bogus values; remove them and re-run statistics on just that variable:
+```{r clean_up}
+adultData <- adultData[which(adultData$capital_gain != 99999), ]
+summary(adultData$capital_gain)
+```
+
+## Measuring the central tendency - mean and median
+
+Measures of **central tendency** are a class of statistics used to identify a value that falls in the middle of a set of data.  What is the average, or **mean**, of the ages of our subjects?
+```{r mean}
+round(mean(adultData$age), 2)
+```
+

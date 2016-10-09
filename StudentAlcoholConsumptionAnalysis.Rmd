@@ -1,0 +1,43 @@
+---
+title: "Student Alcohol Consumption Analysis"
+author: "Kevin E. D'Elia"
+date: "October 2nd, 2016"
+output:
+  pdf_document: default
+  html_document:
+    highlight: zenburn
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="./figures/")
+```
+
+## Executive Summary
+The purpose of this analysis is to attempt to establish a correlation between alcohol usage and the social, gender and study time attributes for each student in a Spanish school.
+
+## Pre-requisites/Assumptions
+Before working with this dataset, it is assumed that the following pre-requisites are met:
+
+1. The datasets **student-mat.csv** and **student-por.csv** have been loaded
+2. Since the delimiter in each of the files is a semi-colon and not a comma, the default for _read.csv_ must be overriden
+2. Since there is an duplication of students in both datasets, the **student-merge.R** script has been run
+
+```{r load_data}
+setwd(".")
+mathData <- read.csv("student-mat.csv", sep = ";", stringsAsFactors = TRUE)
+portugeseData <- read.csv("student-por.csv", sep = ";", stringsAsFactors = TRUE)
+dim(mathData)
+dim(portugeseData)
+```
+
+The data dictionary informs us that both datasets contain identically named variables; the datasets vary in the number of observations provided.
+
+What is the structure of the data we are working with?
+```{r structure}
+str(mathData)
+str(portugeseData)
+```
+
+From the data dictionary provided, we are told that the datasets contain a fairly amount of binary nominal data, such as the address variable, with two values:  "U" for "urban" and "R" for "rural".  There are also some numeric fields which correspond to conceptual categorical groupings, such as alcoholic consumption.  For the first case, this is why the parameter _stringsAsFactors_ is set to **TRUE** - it will read these conceptually categorical strings in as factors and hence make them easier to work with later on.
+
