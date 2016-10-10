@@ -296,9 +296,9 @@ Ten real-valued features are computed for each cell nucleus:
 
 ```{r readin_data}
 # For Mac
-# setwd("/Users/kevindelia/Development/MachineLearningWithR/data")
+setwd("/Users/kevindelia/Development/MachineLearningWithR/data")
 # Fo HP
-setwd("/home/kevin/R Work/Machine Learning with R, Second Edition_Code/Chapter 03")
+# setwd("/home/kevin/R Work/Machine Learning with R, Second Edition_Code/Chapter 03")
 # may need to provide the data and attribute it to the author
 wbcd <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
 
@@ -464,3 +464,7 @@ CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq = FALSE)
 ```
 
 Unfortunately, the results of the new transformation show a slight decline in accuracy.  The instances which were correctly classified 98 percent of examples previously, only 95 percent were classified correctly this time.  Making mattters worse, this approach did no better at classifyin the dangerous false negatives.
+
+#### Testing alternative values of k
+
+Using the normalized traiing and test datasets, the same 100 records were classified using several different _k_ values.  Although the classifier was never perfect, the 1-NN approach was able to avoid some of the false negatives at the expense of adding false positives.  It is important to keep in mind, however, that t it would be unwise to tailor our approach too closely to our test data; after all, a different set of 100 patient records is likely to be somewhat different from those used to measure our performance.
