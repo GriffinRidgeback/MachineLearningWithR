@@ -2,8 +2,9 @@
 title: "Baseball Statistics Analysis"
 author: "Kevin E. D'Elia"
 date: "July 11, 2016"
-output: 
-  html_document: 
+output:
+  pdf_document: default
+  html_document:
     highlight: zenburn
     theme: cerulean
 ---
