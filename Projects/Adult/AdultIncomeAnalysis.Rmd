@@ -1,0 +1,209 @@
+---
+title: "Adult Income Analysis"
+author: "Kevin E. D'Elia"
+date: "October 2nd, 2016"
+output:
+  html_document:
+    highlight: zenburn
+    theme: cosmo
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="./figures/")
+```
+
+# Executive Summary
+The purpose of this analysis is to predict whether income exceeds $50K/yr based on census data. Also known as "Census Income" dataset.
+
+# Pre-requisites/Assumptions
+Before working with this dataset, it is assumed that the following pre-requisites are met:
+
+1. The dataset **adult.data.csv** has been loaded
+2. The fields are comma-separated and there is no header
+3. Variable names must be taken from the data dictionary and applied to the data
+
+# Exploring and understanding data
+```{r load_training_data}
+adultData <- read.table("./Adult/adult.data", sep = ",", header = FALSE)
+names(adultData) <- c("age", "workclass", "fnlwgt", "education", "education_num", "marital_status", "occupation", "relationship", "race", "sex", "capital_gain", "capital_loss", "hours_per_week", "native_country", "income_level")
+dim(adultData)
+```
+
+Now read in the test data, ignoring the first row (skip = 1) as it is garbage data, and remove the last column ("income_level"), since that is the column we are trying to predict:
+```{r load_testing_data}
+adultTest <- read.table("./Adult/adult.test", sep = ",", header = FALSE, skip = 1)
+names(adultTest) <- c("age", "workclass", "fnlwgt", "education", "education_num", "marital_status", "occupation", "relationship", "race", "sex", "capital_gain", "capital_loss", "hours_per_week", "native_country", "income_level")
+adultTest <- adultTest[, -15]
+dim(adultTest)
+```
+
+## Exploring the structure of data
+The data dictionary informs us that both datasets contain identically named variables; the datasets vary in the number of observations provided.
+
+What is the structure of the data we are working with?
+```{r structure}
+str(adultData)
+str(adultTest)
+```
+
+## Exploring numeric variables
+
+The structure of the data identifies several variables that are numeric in nature; use the **summary** command to explore them:
+```{r summary}
+summary(adultData[c("age", "education_num", "capital_gain", "capital_loss")])
+```
+
+It looks as if the **capital_gain** variable has some bogus values; remove them and re-run statistics on just that variable:
+```{r clean_up}
+adultData <- adultData[which(adultData$capital_gain != 99999), ]
+summary(adultData$capital_gain)
+```
+
+## Measuring the central tendency - mean and median
+
+Measures of **central tendency** are a class of statistics used to identify a value that falls in the middle of a set of data.  What is the average, or **mean**, of the ages of our subjects?
+```{r mean}
+round(mean(adultData$age), 2)
+```
+
+Recall the output of _summary()_.  What information does this give about our data.  Looking at **income_level**, we can see that our data contains  observations for income levels below $50K at approximately 3.5 times the number of observations for income levels greater than $50K.  Other, similar, inferences can be drawn from several of the other columns.
+
+Another commonly used measure of central tendency is the **median**, the value which occurs halfway through an ordered list of values.  What is the median age of our dataset participants?
+```{r median}
+median(adultData$age)
+```
+
+It appears that the mean age and the median age are very similar.  The reason for having two measures is because the mean and median are affected differently by the values falling at the far ends of the range.  In particular, the mean is highly sensitive to **outliers**, or values that are atypically high or low in relation to the majority of data.  Because the mean is sensitive to outliers, it is more likely to be shifted higher or lower by a small number of extreme values.  If the mean is greater than the median, it means that the extreme values are at the high end, pulling (or shifting) the mean in that direction.
+
+## Measuring spread - quartiles and the 5-number summary
+
+The **five-number summary** is achieved using the _summary()_ command and gives the **spread** of the numeric data.
+
+The span between the _min_ and _max_ values is called the **range**.  Let's look at the range of ages:
+```{r range}
+range(adultData$age)
+diff(range(adultData$age))
+```
+
+The middle 50% of data between Q1 and Q3 is known as the **IQR**
+```{r iqr}
+IQR(adultData$age)
+```
+
+The _quantile()_ function provides a way to identify quantiles for a set of values:
+```{r quantils}
+quantile(adultData$age)
+quantile(adultData$age, probs = c(0.1, 0.99))
+quantile(adultData$age, seq(from = 0, to = 1, by = 0.20))
+```
+
+## Visualizing numeric variables - boxplots
+
+Visualizing numeric variables is commonly done using a **boxplot**, also known as a **box-and-whiskers** plot.
+```{r boxplots}
+boxplot(adultData$age ~ adultData$income_level, main="Ages of Subjects")
+```
+
+The box-and-whiskers plot depicts the five-number summary values using the horizontal lines and dots.  The horizontal lines forming the box in the middle of each figure represent Q1, Q2, and Q3 while reading the plot from the bottom to the top.  The median is denoted by the dark line in the center.  The min and max are the "whiskers" extending up and down from the box; they can extend only a min or max of 1.5 times the IQR below Q1 or above Q3.  Any values below or above this range are **outliers** and from the boxplots shown, there are a large number of them when it comes to age.  As an example, if the **IQR** is 10 and Q1 = 50, Q3 = 125, then outliers would be found when any value is < 50 - (1.5 x 10) or > 125 + (1.5 x 10).
+
+## Visualizing numeric variables - histograms
+A histogram is another way to graphically depict the spread of a numeric variable.  It is similar to a boxplot in a way that it divides the variable's values into a predefined number of portions or **bins** that act as containers for values.  Their similarities end there, however.  On one hand, a boxplot requires that each of the four portions of the data must contain the same number of values, and widens or narrow the bins as needed.  On the other hand, a histogram uses any number of bins of an identical width, but allows the bins to contain different number of values.
+```{r weekly_hours_histogram}
+hist(adultData$hours_per_week, main = "Histogram of Hours worked per Week", xlab = "Weekly hours", breaks = 10, ylim = c(0, 20000))
+```
+
+
+The histogram is composed of a series of bars with heights indicating the count, or **frequency** of values falling within each of the equal width bins partitioning the values.  The vertical lines that separate the bars, as labeled on the horizontal axis, indicate the start and end points of the range of values for the bin.  If you want to override the default bin size, use the _breaks_ parameter with an integer like **breaks = 10** or **c(5000, 10000, 15000, 20000)**.
+
+On this histogram, we see that more than half of the people work between 30 and 40 hours per week, as we have 32561 observations.  There is also a higher frequency for people who work > 40 hours per week than those who work less than that.
+
+Now we look at Age to get a different perspective on histograms.
+```{r age_range_histogram}
+hist(adultData$age, main = "Histogram of Ages", xlab = "Ages", breaks = 20)
+```
+
+This graphs shows that the majority of workers are in the age range of 20-45, and the frequencies drop off rapidly after 45.
+
+Notice also that the shape of the two histograms is somewhat different.  This is called **skew**, specifically, _right skew_, because the values on the high end (right side) are far more spread out than the values on the low end (left side).  _Left skew_ would be just the opposite.
+
+## Understanding numeric data - uniform and normal distributions
+
+A variable's **distribution** describes how likely a value is to fall within various ranges.  If all the values are equally likely to occur, the distribution is said to be **uniform**.
+
+## Measuring spread - variance and standard deviation
+
+Distributions allow us to characterize a large number of values using a smaller number of parameters; the _normal distribution_ is described with just two parameters: **center**: mean and **spread**: standard deviation.
+
+The **variance** is needed to calculate the **standard deviation** and it is the sum of the squared differences of each value and the mean divided by the number of values; the **stnadard deviation** is just the square root of the **variance**.
+```{r variance_stddev}
+mean(adultData$hours_per_week)
+var(adultData$hours_per_week)
+sd(adultData$hours_per_week)
+
+mean(adultData$age)
+var(adultData$age)
+sd(adultData$age)
+```
+
+While interpreting the variance, larger numbers indicate that the data are spread more widely around the mean.  The standard deviation indicates, on average, how much each value differs from the mean.
+
+The standard deviation can be used to quickly estimate how extreme a given value is under the assumption that it came from a normal distribution.  The **68-95-99.7 rule** states that _68%_ of the values in a normal distribution fall withing one standard deviation of the mean, and so on.  So, 3 standard deviations will contain 99.7% of the data.
+
+In application, this means that if the mean = **x** and the standard deviation = **y**, 68% of the data lies between _x - y_ and _x + y_.  The basic principle applies to other distributions: values more than 3 stddevs from the mean are exceedingly rare.
+
+# Exploring categorical variables
+In contrast to _numeric_ data, categorical data is typically examined using tables rather than summary statistics.  A table that presents a single categorical variable is known as a **one-way table**.  The _table()) function can be used to generate one-way tables.
+
+```{r tables}
+table(adultData$education)
+table(adultData$workclass)
+table(adultData$occupation)
+```
+
+The _table()_ output lists the categories of the nominal variables and a count of the number of values falling into this category.  You can use this information to determine proportions - knowing the number of observations, divide this into the particular category count.  The R command _prop.table()_ does this for you.
+```{r prop.table}
+round(prop.table(table(adultData$education)) * 100, digits = 1)
+round(prop.table(table(adultData$workclass)) * 100, digits = 1)
+round(prop.table(table(adultData$occupation)) * 100, digits = 1)
+```
+
+## Measuring the central tendency - the mode
+In statistics terms, the **mode** of a feature is the value occurring most often and is another measure of central tendency.  It is most often used for categorical data, since the mean and median are not defined for nominal variables.  A variable may have more than one mode; the types are **unimodal**, **bimodal**, and **multimodal**.  The R _mode()_ function is not what is used for determining the mode; rather, just look at the table output and find the category with the greatest count.  Commonality is not majority - while a value may have the highest mode, one must look at the percentage relative to the overall set of observations.
+
+# Exploring relationships between variables
+So far, the analysis has been on **univariate** data only.  There are other situaions, such as **bivariate** and **multivariate**.
+
+## Visualizing relationships - scatterplots
+A **scatterplot** is a digarm that visualizes a bivariate relationship, with _y_ as the **dependent** variable and _x_ as the **indepedent** variable.
+```{r scatterplots}
+plot(x = adultData$age, 
+     y = adultData$hours_per_week, 
+     main = "Scatterplot of Hrs./week vs. Age of worker",
+     xlab = "Age of worker",
+     ylab = "Hrs./week")
+```
+A negative association is a line going down, positive, a line going up, and, in this case, a flat line, or a seemingly random scattering of dots, implies no relationship at all.  The strength of a linear association between two variables i measured by **correlation**.  There can also be _non-linear_ relationships between the variables, evidenced by V or U-shaped lines.
+
+## Examining relationships - two-way cross-tabulations
+To examine a relationship between two nominal (categorical) variables, a **two-way cross-tabluation** is used (also know as _crosstab_ or _contingency table_).  A cross-tabulation is similar to a scatterplot in that it allows you to examine how the values of one variable vary by the values of another.  The format is a table in which the rows are the levels of one variable, while the columns are the levels of another.  Counts in each of the table's cells indicate the numer of values falling tinto the particular row and column combination. The _CrossTable()_ option in the **gmodels** package shows the ros, column, and margin percentages in a single table.
+If there are many levels in the categorical variable under examination, it helps to reduce the number of levels through the use of a **dummy variable**; it can be used to divide the levels into more meaningful groups.  The **%in%** operator is used for this task:  it returns **TRUE** or **FALSE** for each value in the vector on the left side of the operator depending on whether the value is found in the vector on the right-hand side.
+```{r dummy_variables}
+adultData$highSchool <- adultData$education %in% c(" 9th", " 10th", " 11th", " 12th")
+table(adultData$highSchool)
+```
+This table shows that about 10% of the observations come from high-school age workers.  We can see how occupation varies by high-school education level:
+```{r crosstabs}
+library(gmodels)
+CrossTable(x = adultData$occupation, y = adultData$highSchool)
+```
+
+The rows in the table indicate the various kinds of occupation.  The columns indicate whether or not the person in that occupation went to high school or not.  The **Column Total** row shows the totals for each boolean state, along with the percentages of the total; the **Row Total** column is similar, so 1597/32561 ~ 0.049.  
+
+Each cell shows: 
+
+1. the number of FALSE/TRUE for each occupation
+2. chi-square values are the cell's contribution to the **Pearson' Chi-squared test for independence** between the two variable.  This test measures how likely it is that the difference in the cell counts in the table is due to chance alone.  If the probability is very low, it provides stong evidence that the two variables are associated.  You can obtain the chi-squared test results by adding an additional parameter specifying _chisq = TRUE_.
+3. The percentage of FALSE/TRUE across the row total, so 1531/1843 ~ 0.831
+4. The percentage of FALSE/TRUE across the column total, so 1531/29506 ~ 0.052
+5. The percentage of FALSE/TRUE across the entire table total, so 1531/32561 ~ 0.047

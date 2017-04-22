@@ -1,0 +1,118 @@
+---
+title: "K Nearest Neighbors"
+author: "Kevin E. D'Elia"
+date: "4/20/2017"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+Machine learning classification algorithms uses the principle that similar things have properties that are alike and thus classify data by placing it in the same category as "nearest neighbors".  This document covers:
+
+1. The key concepts that define **nearest neighbor** classifiers, and why they are considered "lazy" learners.
+2. Methods to ensure similarity of two examples using distance.
+3. Apply a popular nearest neighbor classifier called k-NN.
+
+# Understanding nearest neighbor classification
+In a single sentence, **nearest neighbor** classifiers are defined by their characteristic of classifying unlabeled examples by assigning them the class of similar labeled examples.  In general, nearest neighbor classifiers are well-suited for classification tasks where relationships among the features and the target classes are numerous, complicated, or extremely difficult to understand, yet the items of similar class type tend to be fairly homogeneous.  It doesn't work well for noisy data, where the class boundaries are difficult to define.
+
+## The k-NN algorithm
+Strengths:
+
+* simple and effective
+* makes no assumptions about the underlying data distribution
+* fast training phase
+
+Weaknesses
+
+* does not produce a model,, limiting the ability to understand how the features are related to the class
+* requires selection of an appropriate _k_
+* slow classification phase
+* nominal features and missing data require additional processing
+
+The k-NN algorithm gets its name from the fact that it uses information about an example's k-nearest neighbors to classify unlabeled examples.  After choosing _k_, the number of nearest neighbors, the algorithm requires a training dataset made up of examples that have been classified into several categories, as labeled by a nominal variable.  Then, for each unlabeled record in the test dataset, k-NN identifies _k_ records in the training data that are the "nearest" in similarity.  The unlabeled test instance is assigned the class of the majority of the k nearest neighbors.
+
+The k-NN algorithm treats the features as coordinates in a multidimensional feature space.  For a simple example, a scatterplot is used, with the x-axis having the values for sweetness and the y-axis having the value for crunchiness; the ingredient names appear on the plotted data values.
+
+```{r food_data}
+library(ggplot2)
+
+ingredient <- c("apple", "bacon", "banana", "carrot", "celery", "cheese", "grape", "green bean", "nuts", "orange", "tomato")
+sweetness <- c(10, 1, 10, 7, 3, 1, 8, 3, 3, 7, 6)
+crunchiness <- c(9, 4, 1, 10, 10, 1, 5, 7, 6, 3, 4)
+food.type <- c("fruit", "protein", "fruit", "vegetable", "vegetable", "protein", "fruit", "vegetable", "protein", "fruit", "unknown")
+food.data <- data.frame(ingredient, sweetness, crunchiness, food.type)
+ggplot(food.data, aes(x = sweetness, y = crunchiness, color = food.type)) + geom_point(shape = 2)
+```
+
+With more data added to the dataframe, the plot would show that similar types of foods tend to be grouped closely together.
+
+## Measuring similarity with distance
+
+Finding an unlabeled element's label requires a **distance function**, a formula that measures the similarity between the two instances.  Traditionally, the k-NN algorithm uses **Euclidean distance**, or the shortest direct route between two points.
+
+Euclidean distance is specified by a formula, where _p_ and _q_ are the examples to be compared, each having _n_ features.  The term _p~1~_ refers to the value of the first feature of example _p_, while _q~1~_ refers to the value of the first feature of example _q_.  The R function _dist()_ can be used to calculate the distances using the default value for **method**.
+```{r distances}
+rbind(
+round(dist(food.data[c(7,11), 2:3]), 2),
+round(dist(food.data[c(8,11), 2:3]), 2),
+round(dist(food.data[c(9,11), 2:3]), 2),
+round(dist(food.data[c(10,11), 2:3]), 2)
+)
+```
+
+To classify the tomato as a vegetable, protein, or fruit, being by assigning the tomato the food type of its single nearest neighbor.  This is called 1-NN classification because k = 1.  The orange is the nearest neighbor to the tomato, so the algorithm would classify the tomato as a fruit.  If k = 3, a vote among the three nearest neighbors results in two of the three being fruit, the tomato is again classified as a fruit.
+
+
+
+This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r eruptions, echo=FALSE}
+inputPanel(
+  selectInput("n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2)
+)
+
+renderPlot({
+  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
+       xlab = "Duration (minutes)", main = "Geyser eruption duration")
+  
+  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
+  lines(dens, col = "blue")
+})
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE}
+shinyAppDir(
+  system.file("examples/06_tabsets", package = "shiny"),
+  options = list(
+    width = "100%", height = 550
+  )
+)
+```
+
+Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+
+You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+
+In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+
+
+
