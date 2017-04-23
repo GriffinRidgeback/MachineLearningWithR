@@ -243,51 +243,84 @@ wbcd_test_pred <- knn(train = wbcd_train,
 The `knn()` function returns a factor vector of predicted labels for each of the examples in the **test** dataset.
 
 ## Step 4 - evaluating model performance
+The next step in the process is to evaluate how well the predicted classes in the `wbcd_test_pred` vector match up with the known values in the `wbcd_test_labels` vector.  Using the `CrossTable()` function from the **gmodels** package, the following table is produced.  **Note:** specifying `prop.chisq = FALSE` will remove unnecessary values from the output.
+```{r crossTable}
+# load the "gmodels" library
+library(gmodels)
 
-This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+# Create the cross tabulation of predicted vs. actual
+CrossTable(x = wbcd_test_labels, 
+           y = wbcd_test_pred,
+           prop.chisq = FALSE)
 
-To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+```
 
-## Inputs and Outputs
+The cell percentages in the table indicate the proportion of values that fall into four categories.  The top-left cell indicates the **true negative** results.  These 61 of 100 values are cases where the mass was benign and the k-NN algorithm correctly identified it as such (negative malignancy).  The bottom-right cell indicates the **true positive** results, where the classifier and the clinically determined label agree that the mass is malignant; there were 37 true positives.
 
-You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+The cells falling on the other diagonal (right-to-left) are the **false negative** (lower left) and **false positive** (upper right).  There were 2 cases where the predicted value of _benign_ was incorrect; the mass was actually malignant; there were no cases where a benign tumor was predicted to be malignant.
+
+## Step 5 - improving model performance
+Two techniques for improving performance are:
+
+1. using an alternative method for re-scaling the numeric features
+2. trying several different values for _k_
+
+### Transformation - z-score standardization
+Although normalization is traditionally used for k-NN classification, it may not always be the most appropriate way to re-scale features.  Since the z-score standardized values have no predefined minimum and maximum, extreme values are not compressed towards the center.
+
+To standardize a vector, use R's built-in `scale()` function which, by default, re-scales values using the z-score standardization; also, it can be applied directly to a dataframe, avoiding the need to use `lapply()`.  The **diagnosis** variable is ignored.
+```{r z_normalization}
+# use the scale() function to z-score standardize a data frame
+wbcd_z <- as.data.frame(scale(wbcd[-1]))
+```
+
+Confirm the results by means of summary statistics:
+```{r z_confirmation}
+# confirm that the transformation was applied correctly
+summary(wbcd_z$area_mean)
+```
+The mean of a z-score standardized variable should always be zero, and the range should be fairly compact.  A z-score greater than 3 (standard deviations) or less than -3 indicates an extremely rare value.
+
+Using the z-score dataframe, divide the data into training and test sets, create the labels, perform the algorithm, and compare results:
+```{r z_knn}
+# create training and test datasets
+wbcd_train <- wbcd_z[1:469, ]
+wbcd_test <- wbcd_z[470:569, ]
+
+# re-classify test cases
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test,
+                      cl = wbcd_train_labels, k = 21)
+
+# Create the cross tabulation of predicted vs. actual
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred,
+           prop.chisq = FALSE)
+```
+
+Clearly the results here are not as good as the ones obtained using normalization.
+
+### Testing alternatives values of k
+The following interactive chart will present the cross-tabluation results for various inputs of _k_:
 
 ```{r eruptions, echo=FALSE}
+# try several different values of k
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+
 inputPanel(
-  selectInput("n_breaks", label = "Number of bins:",
-              choices = c(10, 20, 35, 50), selected = 20),
-  
-  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
-              min = 0.2, max = 2, value = 1, step = 0.2)
+  sliderInput("k_values", 
+              label = "Select a value for k",
+              min = 1, 
+              max = 50, 
+              value = 1, 
+              step = 1)
 )
 
-renderPlot({
-  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
-       xlab = "Duration (minutes)", main = "Geyser eruption duration")
-  
-  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
-  lines(dens, col = "blue")
+renderTable({ 
+wbcd_test_pred <- knn(train = wbcd_train, 
+                      test = wbcd_test, 
+                      cl = wbcd_train_labels, 
+                      k = input$k_values)
+
+table(wbcd_test_labels, wbcd_test_pred, dnn = c("Classification", "Prediction"))
 })
 ```
-
-## Embedded Application
-
-It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
-
-```{r tabsets, echo=FALSE}
-shinyAppDir(
-  system.file("examples/06_tabsets", package = "shiny"),
-  options = list(
-    width = "100%", height = 550
-  )
-)
-```
-
-Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
-
-You can also use the `shinyApp` function to define an application inline rather then in an external directory.
-
-In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
-
-
-
