@@ -1,5 +1,5 @@
 ---
-title: "K Nearest Neighbors"
+title: "k Nearest Neighbors"
 author: "Kevin E. D'Elia"
 date: "4/20/2017"
 output: html_document
@@ -55,7 +55,7 @@ With more data added to the dataframe, the plot would show that similar types of
 
 Finding an unlabeled element's label requires a **distance function**, a formula that measures the similarity between the two instances.  Traditionally, the k-NN algorithm uses **Euclidean distance**, or the shortest direct route between two points.
 
-Euclidean distance is specified by a formula, where _p_ and _q_ are the examples to be compared, each having _n_ features.  The term _p~1~_ refers to the value of the first feature of example _p_, while _q~1~_ refers to the value of the first feature of example _q_.  The R function _dist()_ can be used to calculate the distances using the default value for **method**.
+Euclidean distance is specified by a standard formula, where _p_ and _q_ are the examples to be compared, each having _n_ features.  The term _p~1~_ refers to the value of the first feature of example _p_, while _q~1~_ refers to the value of the first feature of example _q_.  The R function `dist()` can be used to calculate the distances using the default value for **method**.
 ```{r distances}
 rbind(
 round(dist(food.data[c(7,11), 2:3]), 2),
@@ -67,7 +67,182 @@ round(dist(food.data[c(10,11), 2:3]), 2)
 
 To classify the tomato as a vegetable, protein, or fruit, being by assigning the tomato the food type of its single nearest neighbor.  This is called 1-NN classification because k = 1.  The orange is the nearest neighbor to the tomato, so the algorithm would classify the tomato as a fruit.  If k = 3, a vote among the three nearest neighbors results in two of the three being fruit, the tomato is again classified as a fruit.
 
+## Choosing an appropriate k
+The decision of how many neighbors to use for k-NN determines how well the model will generalize to future data.  The balance between overfitting and underfitting the training data is a problem known as **bias-variance tradeoff**.  Choosing a large _k_ reduces the impact or variance caused by noisy data, but can bias the learner so that it runs the risk of ignoring small, but  important patterns.
 
+Suppose we took the extreme stance of setting a very large _k_, as large as the total number of observations in the training data.  With every training instance represented in the final vote, the most common class always has a majority of the voters.  The model would consequently always predict the majority class, regardless of the nearest neighbors.
+
+On the opposite extreme, using a single nearest neighbor allows the noisy data or outliers to unduly influence the classification of examples.  For example, suppose some of the training examples were accidentally mislabeled.  Any unlabeled example that happens to be nearest to the incorrectly labeled neighbor will be predicted to have the incorrect class, even if nine other nearest neighbors would have voted differently.
+
+In practice, choosing _k_ depends on the difficulty of the concept to be learned and the number of records in the training data.  One common practice is to begin with _k_ equal to the square root of the number of training examples.  
+an alternative approach is to test several _k_ values on a variety of test datasets and choose the one that delivers the best classification performance.
+
+## Preparing data for use with k-NN
+Features are typically transformed to a standard range prior to applying the k-NN algorithm because the distance formula is highly dependent on how features are measured.  In particular, if certain features have much larger range of values than the others, the distance measurements will be strongly dominated by the features with larger ranges.  An example of this would be to add a feature that has a scale orders of magnitude greater than the other features (i.e., most features are in the range of 1-10 and the new feature is in the range of 1-10,000 or greater).  The solution is to re-scale the features by shrinking or expanding their range such that each one contributes relatively equally to the distance formula.  The goal is to get the over-sized feature to be on the same scale as the other features.
+
+The traditional method of re-scaling features for k-NN is **min-max normalization**.  This process transforms a feature such that all of its values fall in a range between 0 and 1.  The formula for normalizing a feature is as follows:
+
+$X_{new} = X - min(X) / max(X) - min(X)$
+
+Essentially, the formula subtracts the minimum of feature X from each value and divides by the range of X.  Normalized feature values can be interpreted as indicating how far from 0% to 100% the original value fell along the range between the original minimum and maximum.
+
+Another common transformation is called **z-score standardization**:
+
+$X_{new} = X - \mu / \sigma$
+
+This formula re-scales each of the feature's values in terms of how many standard deviations they fall above or below the mean value; the resulting value is called a **z-score**.  The z-scores fall in an unbound range of negative and positive numbers; unlike the normalized values, they have no predefined minimum and maximum.
+
+The Euclidean distance formula is not defined for nominal data, which must be converted into a numeric format using **dummy encoding** where a value of 1 indicates one category and 0 the other.  Typical example is male/female where the encoding results in a single variable named **male**.  This is true more generally as well.  An _n_-category nominal feature can be dummy encoded by creating the binary indicator variables for _(n-1)_ levels of the feature.  For example, the dummy coding for a three-category temperature variable (for example, hot, medium, or cold) could be set up as _(3 - 1) = 2_ features, as in:
+
+$hot = \lgroup$ 
+1 if x = hot
+0 otherwise
+
+$medium = \lgroup$
+1 if x = medium 
+0 otherwise
+
+Knowing that hot and medium are both _0_ is enough to know that the temperature is cold; there is no need for a third feature for the cold category.
+
+## Why is the k-NN algorithm lazy?
+Classification algorithms based on the nearest neighbor methods are considered **lazy learning** algorithms because no abstraction occurs.  A lazy learner is not really learning anything; instead, it merely stores the training data verbatim.  This allows the training phase, which is not actually training anything, to occur very rapidly.  The downside is that the process of making predictions tends to be relatively slow in comparison to training.  Due to the heavy reliance on the training instances rather than an abstracted model, lazy learning is also known as **instance-based learning** or **rote learning**.
+
+As instance-based learners do not build a model, the method is said to be in a class of **non-parametric** learning methods - no parameters are learned about the data.  Without generating theories about the underlying data, non-parametric methods limit our ability to understand how the classifier is using the data.  On the other hand, this allows the learner to find natural patterns rather than trying to fit the data into a preconceived and potentially biased functional form.
+
+# Example - diagnosing breast cancer with the k-NN algorithm
+To investigate the utility of machine learning for detecting cancer, the k-NN algorithm will be applied to measurements of biopsied cells from women with abnormal breast masses.
+
+## Step 1 - collecting data
+
+The dataset comes from the UCI Machine Learning Repository and is loaded as follows:
+```{r load_data}
+wbcd <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
+```
+
+## Step 2 - exploring and preparing the data
+
+Evaluating the structure gives the following:
+```{r structure}
+str(wbcd)
+```
+The first variable is an integer variable named _id_; it does not provide any useful information and will be excluded from the model.  In general, ID variables should be excluded.  Not doing so can lead to erroneous findings because the ID can be used to uniquely "predict" each example.  Therefore, a model that includes an identifier will suffer from overfitting and is unlikely to generalize well to other data.  It is dropped using:
+```{r drop_ID}
+# drop the id feature
+wbcd <- wbcd[-1]
+```
+
+The next variable, _diagnosis_, is the one to be predicted.  The _table()_ output indicates that 357 masses are benign while 212 are malignant:
+```{r table}
+table(wbcd$diagnosis)
+```
+
+Many R machine learning classifiers require that the target feature is coded as a factor; the single-letter values can also be given more meaningful names as well:
+```{r recoding}
+# recode diagnosis as a factor
+wbcd$diagnosis <- factor(wbcd$diagnosis, 
+                         levels = c("B", "M"),
+                         labels = c("Benign", "Malignant"))
+```
+
+Using _prop.table()_, the percentages for each level can be determined:
+```{r proportions}
+# table or proportions with more informative labels
+round(prop.table(table(wbcd$diagnosis)) * 100, digits = 1)
+```
+
+Looking at some of the numeric features, a problem with some of the values appears.  As shown below, the impact of **area** due to its large range of values will cause potential problems for the classifier.
+```{r unnormalized}
+# summarize three numeric features
+summary(wbcd[c("radius_mean", "area_mean", "smoothness_mean")])
+```
+
+### Transformation - normalizing numeric data
+A simple normalization function, in combination with R's `lapply()` method, will allow for accurate scaling of all the numeric data columns.
+```{r normalize}
+# create normalization function
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+```
+
+And to test:
+```{r test_normalize}
+# test normalization function - result should be identical
+normalize(c(1, 2, 3, 4, 5))
+normalize(c(10, 20, 30, 40, 50))
+```
+
+The function, despite the fact that the values in the second vector are 10 times larger than the first vector, after normalization, they both appear exactly the same.
+
+And then apply it to the numeric data.  Since _lapply()_ returns a list, it needs to be converted to a data frame for further processing.
+```{r apply_normalization}
+# normalize the wbcd data
+wbcd_n <- as.data.frame(lapply(wbcd[2:31], normalize))
+```
+
+To confirm that the transformation was applied correctly, the **area_mean** value is examined again:
+```{r area_mean}
+# confirm that normalization worked
+summary(wbcd_n$area_mean)
+```
+
+As expected, the **area_mean** variable, which originally ranged from 143.5 to 2501.0, now ranges from 0 to 1.
+
+### Data preparation - creating training and test datasets
+Since the data is already labeled, it is not interesting to predict what we already know.  Additionally, any performance measures we obtain during the training may be misleading as we don not know the extent to which cases have been over-fitted or how well the learner will generalize to unseen cases.  In the absence of any new data, it can be simulated by dividing the data in to two portions:  a training dataset that will be used to build the k-NN model and a test dataset that will be used to estimate the predictive accuracy of the model.  It is accomplished like so:
+```{r train_test}
+# create training and test data
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+```
+
+Since the data in this dataset are randomly ordered, the preceding code works just fine.  If, however, there was some ordering to the data, chronological, for instance, then the subset would need to be taken using random sampling techniques.
+
+When the normalized training and test dataset were constructed, the target variable _diagnosis_ was excluded.  For training the k-NN model, the classification labels need to be stored in factor vectors, split  between the training and test datasets.  **Note:**  the first column from the original dataset was dropped, so the _diagnosis_ column is now the first column in the dataset.
+```{r labels}
+# create labels for training and test data
+wbcd_train_labels <- wbcd[1:469, 1]
+wbcd_test_labels <- wbcd[470:569, 1]
+```
+
+## Step 3 - training a model on the data
+With training data and labels vector, classification of unknown records can proceed.  For the k-NN algorithm, the training phase actually involves no model building; the process of training a lazy learner like k-NN simply involves storing the input data in a structured format.
+
+The R package _class_ provides a set of basic R functions for classification.  It can be installed using
+```
+install.packages("class")
+```
+Before using, it needs to be loaded as follows:
+```{r use_class}
+library(class)
+```
+
+The `knn()` function in the _class_ package provides a standard, classic implementation of the k-NN algorithm.  For each instance in the test data, the function will identify the k-Nearest Neighbors, using Euclidean distance, where _k_ is a user-specified number.  The test instance is classified by taking a "vote" among the k-Nearest Neighbors - specifically this involves assigning the class of the majority of the _k_ neighbors.  A tie vote is broken at random.
+
+Training and classification using the `knn()` function is performed in a single function call, using four parameters:
+```
+p <- knn(train, test, class, k)
+```
+where:
+
+* `train` is a dataframe containing numeric training data
+* `test` is a dataframe containing numeric testing data
+* `class` is a factor vector with the class for each row in the training data
+* `k` is an integer indicating the number of nearest neighbors
+
+The function returns a factor vector of predicted classes for each row in the test data frame.
+
+Since the training data contains 469 instances, a good starting point is `k = 21`, an odd number roughly equal to the square root of 469.  With a two-category outcome, using an odd number eliminates the chance of ending with a tie vote.
+```{r knn}
+wbcd_test_pred <- knn(train = wbcd_train, 
+                      test = wbcd_test,
+                      cl = wbcd_train_labels, 
+                      k = 21)
+```
+
+The `knn()` function returns a factor vector of predicted labels for each of the examples in the **test** dataset.
+
+## Step 4 - evaluating model performance
 
 This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
 
