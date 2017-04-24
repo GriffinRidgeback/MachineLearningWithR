@@ -299,7 +299,7 @@ CrossTable(x = wbcd_test_labels, y = wbcd_test_pred,
 Clearly the results here are not as good as the ones obtained using normalization.
 
 ### Testing alternatives values of k
-The following interactive chart will present the cross-tabluation results for various inputs of _k_:
+The following interactive chart will present the cross-tabluation results for various inputs of _k_.  Note that larger values of _k_ fail to alter the truth table meaningfully.
 
 ```{r eruptions, echo=FALSE}
 # try several different values of k
@@ -310,9 +310,10 @@ inputPanel(
   sliderInput("k_values", 
               label = "Select a value for k",
               min = 1, 
-              max = 50, 
+              max = 25, 
               value = 1, 
-              step = 1)
+              step = 1,
+              width = '200%')
 )
 
 renderTable({ 
