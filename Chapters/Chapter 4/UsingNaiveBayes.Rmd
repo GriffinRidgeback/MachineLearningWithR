@@ -1,0 +1,72 @@
+---
+title: "Probabilistic Learning - Classification using Naive Bayes"
+author: "Kevin D'Elia"
+date: "April 29th, 2017"
+output: 
+  html_notebook: 
+    highlight: pygments
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Understanding Naive Bayes
+Thomas Bayes developed foundational principles to describe the probability of events, and how probabilities should be revised in the light of additional information.  These principles formed the foundation for what are now known as **Bayesian methods**.
+
+Classifiers based on Bayesian methods utilize training data to calculate an observed probability of each outcome based on the evidence provided by feature values.  When the classifier is later applied to unlabeled data, it uses the observed probabilities to predict the most likely class for the new features.
+
+Bayesian classifiers are useful for:
+
+* Text classification, such as junk e-mail (spam) filtering
+* Intrusion or anomaly detection in computer networks
+* Diagnosing medical conditions given a set of observed symptoms
+
+Typically, Bayesian classifiers are best applied to problems in which the information from numerous attributes should be considered simultaneously in order to estimate the overall probability of an outcome.  While many machine learning algorithms ignore features that have weak effects, Bayesian methods utilize all the available evidence to subtly change the predictions.  If large number of features have relatively minor effects, taken together, their combine impact could be quite large.
+
+## Basic concepts of Bayesian methods
+
+Bayesian probability theory is rooted in the idea that the estimated likelihood of an **event**, or a potential outcome, should be based on the evidence at hand across multiple **trials**, or opportunities for the event to occur.
+
+```{r bayes_table, echo=FALSE}
+library(knitr)
+
+events <- c("Heads result", "Rainy weather", "Message is spam", "Candidate becomes president", "Win the lottery")
+trials <- c("Coin flip", "A single day", "Incoming e-mail message", "Presidential election", "Lottery ticket")
+df <- data.frame(events, trials)
+column.names <- c("Event", "Trial")
+kable(df, col.names = column.names)
+```
+## Understanding probability
+
+The probability of an event is estimated from the observed data by dividing the number of trials in which the event occurred by the total number of trials.  To denote these probabilities, we use notation in the form _P(A)_ which signifies the probability of event _A_.
+
+The probability of all the possible outcomes of a trial must always sum to 1, because a trial always results in some outcome happening.  Thus, if the trial has two outcomes that cannot occur simultaneously, such as rainy versus sunny or spam versus ham, then knowing the probability of either outcome reveals the probability of the other.  For example, given the value _P(spam) = 0.20_, then _P(ham) = 1 - 0.20 = 0.80_.  This concludes that spam and ham are **mutually exclusive and exhaustive** events, which implies that they cannot occur at the same time and are the only possible outcomes.
+
+Because an event cannot simultaneously happen and not happen, an event is always mutually exclusive and exhaustive with its **complement**, or the event comprising of the outcomes in which the event of interest does not happen.  The complement of event _A_ is typically denoted _A^c^_ or _A^'^_.  Additionally, the shorthand notation _P(A^c^)_ denotes the probability of event _A_ not occurring.
+
+## Understanding joint probability
+Often, we are interested in monitoring several non-mutually exclusive events for the same trial.  If certain events occur with the event of interest, we may be able to use them to make predictions.  Consider, for instance, a second event based on the outcome that an e-mail message contains a particular word that would most likely appear only in a spam message; its presence in an incoming e-mail is therefore a very strong piece of evidence that the message is spam.  If it is known that 20% of all messages were spam and 5% of all messages contained the word in question, the goal is to estimate the probability that both _P(spam)_ and _P(word)_ occur; this is written as _P(spam $\cap$word)_.  This notation signifies the **intersection** of the two events, or to the event where **both** _A_ and _B_ occur.
+
+Calculating _P(spam $\cap$word)_ depends on the **joint probability** of the two events or how the probability of one event is related to the probability of the other.  If the two events are totally unrelated, the are called **independent events**.  This is not to say that independent events cannot occur at the same time; event independence simply implies that knowing the outcome of one event does not provide any information about the outcome of the other.  For instance, the outcome of a heads result on a coin flip is independent from whether the weather is rainy or sunny on any given day.
+
+If all events were independent, it would be impossible to predict one event by observing another.  In other words, **dependent events** are the basis of predictive modeling.  Calculating the probability of dependent events is a bit more complex than for independent events.  If _P(spam)_ and _P(word)_ were independent, calculating _P(spam $\cap$word)_, the probability of both events happening at the same time, is easy.  It is simply _0.05 * 0.20 = 0.01_.  More generally, for independent events _A_ and _B_, the probability of both happening can be expressed as _P(spam $\cap$word) = P(A) * P(B)_.  But it is more likely that the two probabilities are highly dependent, which requires a more careful formulation of the relationship between the two events based on advanced Bayesian methods.
+
+## Computing conditional probability with Bayes' theorem
+
+**Bayes' theorem**: describes the relationship between dependent events; a way of thinking about how to revise an estimate of the probability of one event in light of the evidence provided by another event:
+
+_P(A $\mid$ B) = P(A $\cap$ B) / P(B)_
+
+The notation _P(A $\mid$ B)_ is read as the probability of event _A_, given that event _B_ occurred.  This is known as **conditional probability**, since the probability of _A_ is dependent (that is, conditional) on what happened with event _B_.  Bayes' theorem tells us that our estimate of _P(A $\mid$ B)_ should be based on _P(A $\cap$ B)_, a measure of how often _A_ and _B_ are observed to occur together, and _P(B)_, a measure of how often _B_ is observed to occur in general.
+
+Bayes' theorem states that the best estimate of _P(A $\mid$ B)_ is the proportion of trials in which _A_ occurred with _B_ out of all the trials in which _B_ occurred.  In plain language, this means that if there is knowledge that event _B_ occurred, the probability of event _A_ is higher the more often that _A_ and _B_ occur together each time _B_ is observed.  In a way, this adjusts _P(A $\cap$ B)_ for the probability of _B_ occurring; if _B_ is extremely rate, _P(B)_ and _P(A $\cap$ B)_ will always be small; however, if _A_ and _B_ almost always happen together, _P(A $\mid$ B)_ will be high regardless of the probability of _B_.
+
+By definition, _P(A $\cap$ B) = P(A $\mid$ B) * P(B)_ by algebra; rearrange according to _P(A $\cap$ B) = P(B $\cap$ A)_ with resulting conclusion that _P(A $\cap$ B) = P(B $\mid$ A) * P(A)_ (swapping B's and A's).  This leads to:
+
+_P(A $\mid$ B) = P(A $\cap$ B) / P(B) = P(B $\mid$ A) * P(A) / P(B)_
+
+Continuing with the example, the best estimate of _P(spam)_ was 20%; this is known as the **prior probability**.  Looking more carefully at the set of previously received messages to examine the frequency of the term in question results in the probability that this word was used in previous spam messages, or _P(word $\mid$ spam),  is called the **likelihood**.  The probability that the word appeared in any message at all, or _P(word)_, is known as the **marginal likelihood**.
