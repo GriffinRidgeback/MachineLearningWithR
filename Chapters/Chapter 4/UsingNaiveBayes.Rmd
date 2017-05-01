@@ -59,14 +59,66 @@ If all events were independent, it would be impossible to predict one event by o
 
 **Bayes' theorem**: describes the relationship between dependent events; a way of thinking about how to revise an estimate of the probability of one event in light of the evidence provided by another event:
 
-_P(A $\mid$ B) = P(A $\cap$ B) / P(B)_
+_P(A $\mid$ B) = $\frac{P(A \cap B)}{P(B)}$_
 
 The notation _P(A $\mid$ B)_ is read as the probability of event _A_, given that event _B_ occurred.  This is known as **conditional probability**, since the probability of _A_ is dependent (that is, conditional) on what happened with event _B_.  Bayes' theorem tells us that our estimate of _P(A $\mid$ B)_ should be based on _P(A $\cap$ B)_, a measure of how often _A_ and _B_ are observed to occur together, and _P(B)_, a measure of how often _B_ is observed to occur in general.
 
 Bayes' theorem states that the best estimate of _P(A $\mid$ B)_ is the proportion of trials in which _A_ occurred with _B_ out of all the trials in which _B_ occurred.  In plain language, this means that if there is knowledge that event _B_ occurred, the probability of event _A_ is higher the more often that _A_ and _B_ occur together each time _B_ is observed.  In a way, this adjusts _P(A $\cap$ B)_ for the probability of _B_ occurring; if _B_ is extremely rate, _P(B)_ and _P(A $\cap$ B)_ will always be small; however, if _A_ and _B_ almost always happen together, _P(A $\mid$ B)_ will be high regardless of the probability of _B_.
 
-By definition, _P(A $\cap$ B) = P(A $\mid$ B) * P(B)_ by algebra; rearrange according to _P(A $\cap$ B) = P(B $\cap$ A)_ with resulting conclusion that _P(A $\cap$ B) = P(B $\mid$ A) * P(A)_ (swapping B's and A's).  This leads to:
+By definition, _P(A $\cap$ B) = P(A $\mid$ B) $\times$ P(B)_ by algebra; rearrange according to _P(A $\cap$ B) = P(B $\cap$ A)_ with resulting conclusion that _P(A $\cap$ B) = P(B $\mid$ A) $\times$ P(A)_ (swapping B's and A's).  This leads to:
 
-_P(A $\mid$ B) = P(A $\cap$ B) / P(B) = P(B $\mid$ A) * P(A) / P(B)_
+_P(A $\mid$ B) = $\frac{P(A \cap B)}{P(B)}$ = $\frac{P(B \mid A) \times P(A)}{P(B)}$_
 
-Continuing with the example, the best estimate of _P(spam)_ was 20%; this is known as the **prior probability**.  Looking more carefully at the set of previously received messages to examine the frequency of the term in question results in the probability that this word was used in previous spam messages, or _P(word $\mid$ spam),  is called the **likelihood**.  The probability that the word appeared in any message at all, or _P(word)_, is known as the **marginal likelihood**.
+Continuing with the example, the best estimate of _P(spam)_ was 20%; this is known as the **prior probability**.  Looking more carefully at the set of previously received messages to examine the frequency of the term in question results in the probability that this word was used in previous spam messages, or _P(word $\mid$ spam)_,  is called the **likelihood**.  The probability that the word appeared in any message at all, or _P(word)_, is known as the **marginal likelihood**.
+
+By applying Bayes' theorem to this evidence, we can compute a **posterior probability** that measures how likely the message is to be spam.  If the posterior probability is greater than 50%, the message is more likely to be spam.  The following lists shows how the definitions given map to the components of the Bayes' theorem:
+
+**_P(A $\mid$ B) = $\frac{P(B \mid A) \times P(A)}{P(B)}$_**
+
+**posterior probability** = _P(A $\mid$ B)_
+
+**likelihood**            = _P(B $\mid$ A)_
+
+**prior probability**      = _P(A)_
+
+**marginal likelihood**   = _P(B)_
+
+To calculate these components of Bayes' theorem, it helps to construct a **frequency table** that records the number of times the word appeared in spam and ham messages.  Just like a two-way cross-tabulation, one dimension of the table indicates levels of the class variable (spam or ham), while the other dimension indicates levels for features (word: yes or no).  The cells then indicate the number of instances having the particular combination of class value and feature value.  The frequency table can then be used to construct a **likelihood table**.  The rows of the likelihood table indicate the conditional probabilities for the word (yes/no), given that an e-mail was ham or spam.
+
+# The Naive Bayes algorithm
+
+This algorithm describes a simple method to apply Bayes' theorem to classification problems; it is the most common of the machine learning methods to do so, especially in the area of text classification.  The algorithm is so named because it makes some "naive" assumptions about the data, namely, that all of the features in the dataset are equally important and independent - these assumptions are rarely true in most real-world applications.
+
+For example, if you were attempting to identify spam by monitoring e-mail messages, it is almost certainly true that some features will be more important than others.  For example, the -email sender may be a more important indicator of spam than the message text.  Additionally, the words in the message body are not independent from one another, since the appearance of some words is a very good indication that other words are also likely to appear.  A message with the word _Ritalin_ will probably also contain the words _prescription_ or _drugs_.
+
+## Classification with Naive Bayes
+By adding terms, a larger likelihood table can be constructed.  Assume four words: W~1~, W~2~, W~3~, and W~4~.  As new messages arrive, a calculation of the posterior probability will determine if they are more likely to be spam or ham, given the likelihood of the words found in the message text.  For example, assume that a message contains W~1~ and W~4~ but neither W~2~ or W~3~.  Using Bayes' theorem, the following formula defines the problem:
+
+**_P(spam $\mid$ W~1~ $\cap \neg$ W~2~ $\cap \neg$ W~3~ $\cap$ W~4~) = $\frac{P(W_1 \cap \neg W_2 \cap \neg W_3 \cap W_4 \mid spam) \times P(spam)}{P(W_1 \cap \neg W_2 \cap \neg W_3 \cap W_4)}$_**
+
+As this does not scale well computationally, a work-around uses the fact that Naive Bayes assumes independence among events, specifically, **class-conditional independence**, which means that events are independent so long as they are conditioned on the same class value (in this case, _spam_ or _ham_).  This allows the formula to be simplified using the probability rule for independent events, which states that _P(A $\cap$ B) = P(A) $\times$ P(B)_.  Because the denominator does not depend on the class (spam or ham), it is treated as a constant value and can be ignored for the time being.  This means that the conditional probability of spam can be expressed as:
+
+**P(spam $\mid$ W~1~ $\cap \neg$ W~2~ $\cap \neg$ W~3~ $\cap$ W~4~) $\propto$ P(W~1~ $\mid$ spam)P($\neg$ W~2~ $\mid$ spam)P($\neg$ W~3~ $\mid$ spam)P(W~4~ $\mid$ spam)P(spam)**
+
+And the probability that the message is ham can be expressed as:
+
+**P(ham $\mid$ W~1~ $\cap \neg$ W~2~ $\cap \neg$ W~3~ $\cap$ W~4~) $\propto$ P(W~1~ $\mid$ ham)P($\neg$ W~2~ $\mid$ ham)P($\neg$ W~3~ $\mid$ ham)P(W~4~ $\mid$ ham)P(ham)**
+
+Note that the equals symbol has been replaced by the proportional-to symbol to indicate the fact that the denominator has been omitted.
+
+Using some pre-canned data, the overall likelihood of spam = 0.012 while the overall likelihood of ham = 0.002. Because the division of spam/ham = 6, this particular message is 6 times more likely to be spam than ham.  However, to convert these numbers into probabilities, one last step must be performed to reintroduce the denominator that had been excluded.  Essentially, the likelihood of each outcome must be re-scaled by dividing it by the total likelihood across all possible outcomes.
+
+In this way, the probability of spam is equal to the likelihood that the message is spam divided by the likelihood that the message is either spam or ham; the resulting value is 85.7%; if this is P(spam), then by mutual exclusivity, p(ham) = 1 = P(spam), or 14.3%.
+
+The Naive Bayes classification algorithm used in the preceding example can be summarized by the following formula.  The probability of level _L_ for class _C_, given the evidence provided by features _F~1~_ through _F~n~_, is equal to the product of the probabilities of each piece of evidence conditioned on the class level, the prior probability of the class level, and a scaling factor _$\frac{1}{Z}$_, which converts the likelihood values into probabilities:
+
+*P(C~L~ $\mid$ F~1~, $\ldots$, F~n~) = $\frac{1}{Z}$ p(C~L~) $\prod_{i=1}^{n}$  p(F~i~ $\mid$ C~L~)*
+
+Although this equation seems intimidating, as the prior example illustrated, the series of steps is fairly straightforward.  Begin by building a frequency table, use this to build a likelihood table, and multiply the conditional probabilities according to the Naive Bayes' rule.  Finally, divide by the total likelihood to transform each class likelihood into a probability.
+
+
+
+
+
+
+
