@@ -3,6 +3,11 @@ title: "Probabilistic Learning - Classification using Naive Bayes"
 author: "Kevin D'Elia"
 date: "April 29th, 2017"
 output: 
+  html_document: 
+    highlight: kate
+    number_sections: yes
+    theme: spacelab
+    toc: yes
   html_notebook: 
     highlight: pygments
     number_sections: yes
@@ -11,7 +16,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Understanding Naive Bayes
@@ -115,6 +120,306 @@ The Naive Bayes classification algorithm used in the preceding example can be su
 *P(C~L~ $\mid$ F~1~, $\ldots$, F~n~) = $\frac{1}{Z}$ p(C~L~) $\prod_{i=1}^{n}$  p(F~i~ $\mid$ C~L~)*
 
 Although this equation seems intimidating, as the prior example illustrated, the series of steps is fairly straightforward.  Begin by building a frequency table, use this to build a likelihood table, and multiply the conditional probabilities according to the Naive Bayes' rule.  Finally, divide by the total likelihood to transform each class likelihood into a probability.
+
+## The Laplace estimator
+
+Before Naive Bayes can be used for more complex problems, there are some nuances to consider.  Suppose a message contained all four terms.  The likelihood for spam would be 0, making any spam calculations resolve to 0 and ham would then be 1 - p(spam) = 1, a non-nonsensical prediction.  The problem might arise if an event never occurs for one or more levels of the class.  For instance, the term _Groceries_ had never previously appeared in a spam message.  Consequently, _P(spam $\mid$ Groceries) = 0%_.
+
+Because probabilities in the Naive Bayes formula are multiplied in a chain, this 0% value causes the posterior probability of spam to be 0, giving the word _Groceries_ the ability to effectively nullify and overrule all of the other evidence.  Even if the e-mail was otherwise overwhelmingly expected to be spam, the absence of the word _Groceries_ in spam will always veto the other evidence and result in the probability of spam being zero.
+
+A solution to this problem involves using something called the **Laplace estimator**, which essentially adds a small number to each of the counts in the frequency table, which ensures that each feature has a nonzero probability of occurring with each class.  Typically, the Laplace estimator is set to 1, which ensures that each class-feature combination is found in the data at least once.
+
+## Using numeric features with Naive Bayes
+Because Naive Bayes uses frequency tables to learn the data, each feature must be categorical in order to create the combinations of class and feature values comprising of the matrix.  Since numeric features do not have categories of values, the preceding algorithm does not work directly with numeric data.  
+
+One easy and effective solution is to **discretize** numeric features, which simply means that the numbers are put into categories known as **bins**.  For this reason, discretization is also sometimes called **binning**.  This method is ideal when there are large amounts of training data, a common condition while working with Naive Bayes.
+
+There are several different ways to discretize a numeric feature.  Perhaps the most common is to explore the data for natural categories or **cut points** in the distribution of data.  For example, suppose a feature was added to the spam dataset that recorded the time of night or day the e-mail was sent, from 0 to 24 hours past midnight.  The data can then be plotted using a histogram.
+
+# Example - filtering mobile phone spam with the Naive Bayes algorithm
+The limits on the data are (1) short message length, resulting in a smaller potential feature set (2) cryptic shorthand text due to the smaller keyboard
+
+## Step 1 - collecting the data
+There is a site which maintains spam data; download it from there:
+```
+http://www.dt.fee.unicamp.br/~tiago/smsspamcollection
+```
+
+## Step 2 - exploring and preparing the data
+The data must be converted to a representation known as a **bag-of-words**, which ignores word order and simply provides a variable indicating whether the word appears at all.
+```{r load_csv}
+sms_raw <- read.csv("sms_spam.csv", stringsAsFactors = FALSE)
+```
+A quick examination shows that the ```type``` element is currently a character vector although in spirit it is really a categorical variable that will be predicted; convert it to a factor now:
+```{r transform_data}
+str(sms_raw)
+sms_raw$type <- factor(sms_raw$type)
+```
+The data is now in a format where using the ```table()``` command will prove useful.
+```{r tabulate_data}
+table(sms_raw$type)
+```
+### Data preparation - cleaning and standardizing text data
+
+The majority of text processing work in R has been encapsulated in the _tm_ package.  Make sure it is loaded:
+```{r load_tm}
+library(tm)
+```
+The first step in processing text data involves creating a **corpus**, which is a collection of text documents.
+The documents can be short of long, form individual news articles, pages in a book or on the web, or entire books.
+
+To create a _Virtual Corpus_, which is in-memory as opposed to a _Physical Corpus_, which is on disk, the ```VCorpus()``` command is used:
+```{r create_corpus}
+sms_corpus <- VCorpus(VectorSource(sms_raw$text))
+```
+
+Printing the corpus shows that it contains documents for each of the 5,559 SMS messages in the training data.  Because the corpus is essentially a complex list, list operations can be used to select documents in the corpus by using the _inspect()_ method with list operators:
+```{r corpus_summary}
+print(sms_corpus)
+inspect(sms_corpus[1:2])
+```
+
+To view the actual message text, the ```as.character()``` function must be applied to the desired message(s):
+```{r text_output}
+as.character(sms_corpus[[1]])
+```
+
+Use ```lapply()``` to handle multiple documents:
+```{r multitext_output}
+lapply(sms_corpus[1:2], as.character)
+```
+
+The text must be divided into individual words after it has been cleaned using standard text cleaning text-cleaning techniques using functions like *tm_map()*, as shown in the following section:
+```{r tm_map_code}
+sms_corpus_clean <- tm_map(sms_corpus, content_transformer(tolower))
+sms_corpus_clean <- tm_map(sms_corpus_clean, removeNumbers)
+sms_corpus_clean <- tm_map(sms_corpus_clean, removeWords, stopwords())
+sms_corpus_clean <- tm_map(sms_corpus_clean, removePunctuation)
+sms_corpus_clean <- tm_map(sms_corpus_clean, stemDocument)
+sms_corpus_clean <- tm_map(sms_corpus_clean, stripWhitespace)
+```
+
+The documentation for the _tm_ package covers all of these functions in detail, and most of the behavior is self-defined by the method names.  Here is what the data looks like pre- and post-cleansing:
+```{r cleaning_results, echo=FALSE}
+sms_corpus[[1]]$content
+sms_corpus_clean[[1]]$content
+sms_corpus[[2]]$content
+sms_corpus_clean[[2]]$content
+sms_corpus[[3]]$content
+sms_corpus_clean[[3]]$content
+```
+
+
+### Data preparation - splitting text documents into words
+
+The final step is to split the messages into individual components through a process called **Tokenization**, which is a single element of a text string, in this case, words.
+
+This step involves the creation of a **Document-Term Matrix** where rows are documents and columns are terms.  In some cases, the transpose of this is preferable.  That would be a **Term-Document Matrix** and is handy when there are few documents and many terms, the rationale being it is easier to look at many rows than it is to look at many columns.
+
+Each cell in the matrix stores a number indicating a count of the times the word represented by the column appears in the document represented by the row.  A zero value implies that none of the words listed on the top of the columns appear in any of documents and hence is an example of a **sparse matrix**, as many cells will exhibit this state.  Stated in real-world terms, although each message must contain at least one word, the probability of any one word appearing in a given message is small.  To create the DTM:
+
+```{r dtm}
+sms_dtm <- DocumentTermMatrix(sms_corpus_clean)
+```
+
+This will create a DTM object that contains the tokenized corpus using the default settings, which apply minimal processing.  The same tasks can be accomplished by applying a list of ```control``` parameter options to override the defaults, as in the following example: 
+```
+sms_dtm <- DocumentTermMatrix(sms_corpus, control = list(tolower = TRUE, 
+                                                        removeNumbers = TRUE, 
+                                                        stopwords = TRUE,
+                                                        removePunctuation = TRUE,
+                                                        stemming = TRUE))
+```
+This applies the same preprocessing steps to the SMS corpus in the same order as done earlier.  However, there is a slight discrepancy in the number of terms in the matrix; this has to do with a minor difference in the ordering of the preprocessing steps.  The DocumentTermMatrix() function applies its cleanup functions to the text strings only after they have been split apart into words.  Thus, it uses a slightly different stop words removal function.  Consequently, some words split differently than when they are cleaned before tokenization.  To fix this, the default stop words function can be overridden with this function, which uses the original replacement function:
+```
+stopwords = function(x) { removeWords(x, stopwords())}
+```
+The difference illustrates an important principle of cleaning text data: order of operations matters.  Sometimes stopwords are needed, as in predictive text applications, since they are part of ordinary speech; other times, they are not, as in sentiment analysis.
+
+### Data preparation - creating training and test datasets
+
+with the data prepared for analysis, it now needs to be split into training and test datasets so that once the spam classifier is built, it can be evaluated on data it has not previously seen.
+
+The DTM is divided into 75% for training and 25% for testing, like so:
+```{r train_test}
+sms_dtm_train <- sms_dtm[1:4169, ]
+sms_dtm_test <- sms_dtm[4170:5559, ]
+```
+
+For convenience later on, it is also helpful to save a pair of vectors with labels for each of the rows in the training and testing matrices; they must be pulled from the raw data, as they are not in the DTM.
+```{r label_data}
+sms_train_labels <- sms_raw[1:4169, ]$type
+sms_test_labels <- sms_raw[4170:5559,]$type
+```
+To confirm that the subsets are representative of the complete set of SMS data, compare the proportion of spam in the training and test data frames, which shows about 13% spam for each of the datasets:
+```{r extract_summary}
+round(prop.table(table(sms_train_labels)), 2)
+round(prop.table(table(sms_test_labels)), 2)
+```
+
+### Visualizing text data - word clouds
+A **word cloud** is a way to visually depict the frequency at which words appear in text data.  The _wordcloud_ package provides a simple R function to create this type of diagram which can be used to compare the clouds for ham and spam.
+
+```{r wordcloud, echo=FALSE}
+library(wordcloud)
+wordcloud(sms_corpus_clean, min.freq = 50, random.order = FALSE, colors = brewer.pal(7,"Accent"))
+```
+
+Perhaps a more interesting visualization involves comparing the clouds for SMS spam and ham by subsetting the raw data based on type:
+```{r spam_ham}
+spam <- subset(sms_raw, type == "spam")
+ham <- subset(sms_raw, type == "ham")
+```
+
+Now construct the wordclouds for each subset:
+```{r spam_ham_clouds, echo=FALSE}
+wordcloud(spam$text, max.words = 40, scale = c(3, 0.5), colors = brewer.pal(7,"Greens"))
+wordcloud(ham$text, max.words = 40, scale = c(3, 0.5), colors = brewer.pal(7,"BrBG"))
+```
+
+The stark differences in the resulting wordclouds suggest that the Naive Bayes model will have some strong key words to differentiate between the classes.
+
+### Data preparation - creating indicator features for frequent words
+The final step in the data preparation process is to transform the sparse matrix into a data structure that can be used to train a Naive Bayes classifier.  With over 6500 features (a feature for every word that appears in at least one SMS message), it's unlikely that all of these are useful for classification.  To reduce the number of features, eliminate any word that appears in less than five SMS messages.  The _findFreqTerms()_ method is used for this purpose, as shown here, to filter out words that appear in at least 5 SMS messages:
+```{r frequent}
+sms_freq_words <- findFreqTerms(sms_dtm_train, 5)
+str(sms_freq_words)
+```
+This vector can be used to filter the training and test datasets more finely to include only terms of a desired frequency:
+```{r filter_words}
+sms_dtm_freq_train <- sms_dtm_train[ , sms_freq_words]
+sms_dtm_freq_test <- sms_dtm_test[, sms_freq_words]
+```
+
+The Naive Bayes classifier is typically trained on data with categorical features.  This poses a problem, since the cells in the sparse matrix are numeric and measure the number of times a word appears in a message (document).  To change the values to categorical variables that simply indicates _yes_ or _no_ depending on whether the word appears at all, the following code will convert counts to _Yes/No_ strings:
+```
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1), labels = c("No", "Yes"))
+}
+```
+```{r convert_function, echo=FALSE}
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1), labels = c("No", "Yes"))
+}
+```
+
+To 'apply' this, use the following code, where the **MARGIN** value specifies that the operation should be applied to the columns of the source dataset:
+```{r convert}
+sms_train <- apply(sms_dtm_freq_train, MARGIN = 2, convert_counts)
+sms_test  <- apply(sms_dtm_freq_test, MARGIN = 2, convert_counts)
+```
+
+The result will be two character type matrices, each with cells indicating "Yes" or "No" for whether the word represented by the column appears at any point in the message represented by the row.
+
+## Step 3 - training a model on the data
+Now that the raw SMS messages have been transformed into a format that can be represented by a statistical model, the Naive Bayes algorithm can be applied - it will used the presence or absence of words to estimate the probability that a given SMS message is spam.  The Naive Bayes implementation in the ```e1071``` package will be used.
+
+Unlike the k-NN algorithm, the Naive Bayes learner is trained and used for classification in separate stages.
+
+**Building the classifier**
+```
+  m <- naiveBayes(train, class, laplace = 0)
+```
+where:
+
+* _train_ is a data frame or matrix containing training data
+* _class_ is a factor vector with the class for each row in the training data
+* _laplace_ is a number to control the Laplace estimator (0 by default)
+
+This function will return a Naive Bayes model object that can be used to make predictions.
+
+**Making Predictions**
+```
+p <- predict(m, test, type = "class")
+```
+where:
+
+* _m_ is a model trained by the ```naiveBayes()``` function
+* _test_ is a data frame or matrix containing test data with the same features as the training data used to build the classifier
+* _type_ is either "class" or "raw" and specifies whether the predictions should be the most likely class value or the raw predicted probabilities
+
+The function will return a vector of predicted class values or raw predicted probabilities depending upon the value of the **type** parameter.
+
+To build the model on the training dataset already constructed:
+
+```{r load_e1071, echo=FALSE}
+library(e1071)
+```
+
+```{r naive_bayes}
+sms_classifier <- naiveBayes(sms_train, sms_train_labels)
+```
+
+## Step 4 - evaluating model performance
+To evaluate the SMS classifier, the predictions need to be tested on unseen messages in the test data.  The _predict()_ function will use the classifier and test datasets created earlier and the predicted values will be compared to the labels associated with the test dataset.
+```{r predict}
+sms_test_pred <- predict(sms_classifier, sms_test)
+```
+
+To compare the predictions to the true values, we'll use the ```CrossTable()``` function, using some additional parameters to make the output easier to read:
+```{r load_gmodels, echo=FALSE}
+library(gmodels)
+```
+```{r evaluate_predictions}
+CrossTable(sms_test_pred, 
+           sms_test_labels,
+           prop.chisq = FALSE,
+           prop.t = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+Looking at the table, a total of only 2.6% of the 1,390 SMS messages were incorrectly classified (6 + 30 = 36).  Among the errors were 6 out of 1207 ham messages that were misidentified as spam, and 30 of the 183 spam messages were incorrectly labeled as ham.  On the other hand, the six legitimate messages that were incorrectly classified as spam could cause significant problems if, because of the filter, a person missed an important text messages.  As always, the question is:  Can the model be tweaked to improve performance and accuracy?
+
+## Step 5 - improving model performance
+Since in the original build of the model the Laplace estimator was set to 0, it allowed words that appeared in zero spam or zero ham messages to have an indisputable say in the classification process.  Can the model be improved by setting the Laplace estimator to 1?  The previous steps are re-run, but this time with a parametric adjustment:
+```{r tuning_bayes}
+sms_classifier2 <- naiveBayes(sms_train, sms_train_labels, laplace = 1)
+sms_test_pred2 <- predict(sms_classifier2, sms_test)
+CrossTable(sms_test_pred2, 
+           sms_test_labels,
+           prop.chisq = FALSE, 
+           prop.t = FALSE, 
+           prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+Adding the Laplace estimator reduced the number of false positives (ham messages erroneously classified as spam) from 5 to 6 and the number of false negatives (spam messages erroneously classified as ham) from 30 to 28.  Care must be exercised before tweaking the model too much in order to maintain the balance between being overly aggressive and overly passive while filtering spam.  Users would prefer that a small number of spam messages slip through the filter than an alternative in which ham messages are filtered too aggressively.
+
+# Summary
+This document discussed classification using Naive Bayes, so named because it is a simplified version of Bayes' theorem that makes so-called "naive" assumptions about the independence of features.  This algorithm constructs tables of probabilities that are used to estimate the likelihood that new examples belong to various classes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
