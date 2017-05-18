@@ -1,0 +1,148 @@
+---
+title: "Divide and Conquer - Classification using Decision Trees and Rules"
+author: "Kevin D'Elia"
+date: "May 13th, 2017"
+output: 
+  html_document: 
+    highlight: kate
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+  html_notebook: 
+    highlight: pygments
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+---
+# Overview
+This notebook covers decision trees and rule learners - two machine learning methods that also make complex decisions from sets of simple choices.  These methods then present their knowledge in the form of logical structures that can be understood with no statistical knowledge.  This aspect makes these models particularly useful for business strategy and process improvement.
+
+# Understanding decision trees
+Decision tree learners are powerful classifiers, which utilize a **tree structure** to model the relationships among the features and the potential outcomes.A decision tree classifier uses a structure of branching decisions, which channel examples into a final predicted class value.
+
+Consider a job offer.  The offer itself is the **root node**, and the offer is then passed through **decision nodes** that require choices to be made based on the attributes of the job.  These choices split the data across **branches** that indicate potential outcomes of a decision, depicted as _yes_ or _no_ outcomes, though in some cases there may be more than two possibilities.  In the case where a final decision can be made, the tree is terminated by **leaf nodes**, also known as **terminal nodes** that denote the action to be taken as the result of the series of decisions.  In the case of a predictive model, the leaf nodes provide the expected result given the series of events in the tree.
+
+A great benefit of decision tree algorithms is that the flowchart-like tree structure is not necessarily exclusively for the learner's internal use.  After the model is created, many decision tree algorithms output the resulting structure in a human-readable format.  This provides tremendous insight into how and why the model works or doesn't work well for a particular task.  This also makes decision trees particularly appropriate for applications in which the classification mechanism needs to be transparent for legal reasons, or in case the results need to be shared with others in order to inform future business practices.  Uses include:
+
+* Credit scoring models in which the criteria that causes an applicant to be rejected need to be clearly documented and free from bias
+* Marketing studies of customer behavior such as satisfaction or churn, which will be shared with management or advertising agencies
+* Diagnosis of medical conditions based on laboratory measurements, symptoms, or the rate of disease progression
+
+Decision trees are perhaps the single most widely used machine learning technique but are not well suited for scenarios where the data has a large number of nominal features with many levels or it has a large number of numeric features.  These cases may result in a very large number of decisions and an overly complex tree.
+
+## Divide and Conquer
+Decision trees are built using a heuristic called **recursive partitioning**.  This approach is also commonly known as **divide and conquer** because it splits the data into subsets, which are then split repeatedly into ever smaller subsets, until the algorithm determines the data within the subsets are sufficiently homogeneous, or another stopping criterion has been met.  The initial split criteria is the feature most predictive of the target class. The examples are then partitioned into groups according to the distinct values of this feature.  Splitting continues in this way until a stopping criterion is reached, such as:
+
+* all (or nearly all) of the examples at the node have the same class
+* there are no remaining features to distinguish among the examples
+* the tree has grown to a predefined size limit
+
+# The C5.0 decision tree algorithm
+
+This is the industry standard to produce decision trees, because it does well for most types of problems directly out of the box.  It can have trouble modeling some relationships due to reliance on **axis-parallel splits**.
+
+## Choosing the best split
+The first challenge that a decision tree will face is to identify which feature to split upon, usually resulting in partitions consisting primarily of a single class.  The degree to which a subset of examples contains only a single class is known as **purity**, and any subset composed of only a single class is called **pure**.
+
+There are various measurements of purity that can be used to identify the best decision tree splitting candidate.  C5.0 uses **entropy**, a concept borrowed from information theory that quantifies the randomness, or disorder, within a set of class values.  Sets with high entropy are very diverse and provide little information about other items that may also belong in the set, as there is no apparent commonality.  The decision tree hopes to find splits that reduce entropy, ultimately increasing homogeneity within the groups.
+
+Typically, entropy is measured in **bits**.  If there are only two possible classes, entropy values can range from 0 to 1.  For _n_ classes, entropy ranges from 0 to _log~2~(n)_.  In each case, the minimum value indicates that the sample is completely homogeneous, while the maximum value indicates that the data are as diverse as possible, and no group has even a small plurality.
+
+The mathematical representation for entropy is:
+
+**Entropy(_S_)** = $\sum_{i=1}^{c}$ _-p~i~ log~2~(p~i~)_
+
+In this formula, for a given segment of data _(S)_, the term _c_ refers to the number of class levels and _p~i~_ refers to the proportion of values falling into class level _i_.  For example, given a partition of data with two classes: red (60%) and white (40%), entropy is calculated as follows:
+```{r entropy}
+-0.60 * log2(0.60) - 0.40 * log2(0.40)
+```
+
+This is how to look at entropy for all possible two-class arrangements.  If the proportion of examples in one class is _x_, then the proportion in the other class is _(1 - x)_.  The ```curve()``` function will plot the entropy for all possible values of _x_:
+```{r entropy_curve}
+x <- 0.60
+xx <- 1 - x
+curve(-x * log2(x) - xx * log2(xx), col = "red", xlab = "x", ylab = "Entropy", lwd = 4)
+```
+
+
+For _x = 0.50_, a 50-50 split results in maximum entropy; as one class increasingly dominates the other, the entropy reduces to zero.
+
+To use entropy to determine the optimal feature to split upon, the algorithm calculates the change in homogeneity that would result from a split on each possible feature, which is a measure know as **information gain**.  The information gain for a feature _F_ is calculated as the difference between the entropy in the segment before the split _(S~1~)_ and the partitions resulting from the split _(S~2~)_:
+
+**InfoGain(_F_)** = Entropy(_S~1~_) - Entropy(_S~2~_)
+
+One complication is that after a split, the data is divided into more than one partition.  Therefore, the function to calculate _Entropy(S~2~)_ needs to consider the total entropy across all of the partitions.  It does this by weighing each partitions' entropy by the proportion of records falling into the partition.  Formulaically, this is:
+
+**Entropy(_S_)** = $\sum_{i=1}^{n}$ _w~i~_ Entropy(_P~i~_)
+
+In simple terms, the total entropy resulting from a split is the sum of the entropy of each of the _n_ partitions weighted by the proportion of examples falling in the partition (_w~i~_).
+
+The higher the information gain, the better a feature is at creating homogeneous groups after a split on this feature  If the information gain is zero, there is no reduction in entropy for splitting on this feature.  On the other hand, the maximum information gain is equal to the entropy prior to the split.  This would imply that the entropy after the split is zero, which means that the split results in completely homogeneous groups.
+
+The previous formulae assume nominal features, but decision trees use information gain for splitting on numeric features as well.  To do so, a common practice is to test various splits that divide the values into groups greater than or less than a numeric threshold.  This reduces the numeric feature into a two-level categorical feature that allows information gain to be calculated as usual.  The numeric cut point yielding the largest information gain is chosen for the split.
+
+## Pruning the decision tree
+A decision tree can continue to grow indefinitely, choosing splitting features and dividing the data into smaller and smaller partitions until each example is perfectly classified or the algorithm runs out of features to split on.  However, if the tree grows overly large, many of the decisions it makes will be overly specific and the model will be overfitted to the training data.  The process of **pruning** a decision tree involves reducing its size such that it generalizes better to unseen data.
+
+One solution to this problem is to stop the tree from growing once it reaches a certain number of decisions or when the decision nodes contain only a small number of examples.  This is called **early stopping** or **pre-pruning** the decision tree.  As the tree avoids doing needless work, this is an appealing strategy.  However, one downside to this approach is that there is no way to know whether the tree will miss subtle, but important patterns that it would have learned had it grown to a larger size.
+
+An alternative, called **post-pruning**, involves growing a tree that is intentionally too large and pruning leaf nodes to reduce the size of the tree to a more appropriate level.  This is often a more effective approach than pre-pruning, because it is quite difficult to determine the optimal depth of a decision tree without growing it first.  Pruning the tree later on allow the algorithm to be certain that all the important data structures were discovered.
+
+C5.0 has an overall strategy of post-pruning.  Nodes and branches that have little effect on the classification errors are removed from the very large tree.  In some cases, entire branches are moved further up the tree or replaced by simpler decisions.  These processes of grafting branches are known as **subtree raising** and **subtree replacement**, respectively.
+
+# Example - identifying risky bank loans using C5.0 decision trees
+Decision trees are widely used in the banking industry due to their high accuracy and ability to formulate a statistical model in plain language.  Since government organizations in many countries carefully monitor lending practices, executives must be able to explain why one applicant was rejected for a loan while the others were approved.  This information is also useful for customers hoping to determine why their credit rating is unsatisfactory.
+
+## Step 1 - collecting data
+The idea being the credit model is to identify factors that are predictive of higher risk of default.  Therefore, the data needs to contain a large number of past bank loans and whether the loan went into default, as well as information on the applicant.
+
+The credit dataset used includes 1,000 examples on loans, plus a set of numeric and nominal features indicating the characteristics of the loan and the loan applicant.  A class variable indicates whether the loan went into default.
+
+## Step 2 - exploring the data
+
+Since the majority of features are already nominal in nature, the ```stringsAsFactors``` value will be left to its default value of ```TRUE```
+```{r load_data}
+credit <- read.csv("credit.csv")
+str(credit)
+```
+
+The _table()_ output shows a couple of loan features that seem likely to predict a default:
+```{r table_output}
+table(credit$checking_balance)
+table(credit$savings_balance)
+```
+
+The checking and savings account balance may prove to be important predictors of loan default status.  Some of the loan's features are numeric, such as its duration and the amount of credit requested:
+```{r summaries}
+summary(credit$months_loan_duration)
+summary(credit$amount)
+```
+
+The ```default``` vector indicates whether the loan applicant was unable to meet the agreed payment terms and went into default.  A total of 30% of the loans in this dataset went into default:
+```{r defaulted_loans}
+table(credit$default)
+```
+
+A high rate of default is undesirable for a bank, because it means that the bank is unlikely to fully recover its investment.  If the model is successful, it will identify applicants that are at high risk to default, allowing the bank to refuse credit requests.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
