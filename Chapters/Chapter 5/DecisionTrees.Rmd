@@ -125,6 +125,204 @@ table(credit$default)
 
 A high rate of default is undesirable for a bank, because it means that the bank is unlikely to fully recover its investment.  If the model is successful, it will identify applicants that are at high risk to default, allowing the bank to refuse credit requests.
 
+### Data preparation - creating random training and test datasets
+To create the training and test datasets, it is necessary to consider if the data in question is ordered or unordered.  In this case, there is a strong likelihood that the credit data might be sorted by loan amount, so if the training data was 90% and the testing data the remaining 10%, the model will be developed on a biased set of data.  This can by solved by using a **random sample**; reproducibility is achieved by using a **seed** value:
+```{r sample_data}
+set.seed(123)
+train_sample <- sample(1000, 900)
+credit_train <- credit[train_sample, ]
+credit_test <- credit[-train_sample, ]
+```
+
+This code should result in roughly the same results for defaulted loans that was available in the full dataset:
+```{r defaults_table}
+round(prop.table(table(credit_train$default)), 2)
+round(prop.table(table(credit_test$default)), 1)
+```
+
+## Step 3 - training a model on the data
+
+**Building the classifier:**
+
+```m <- C5.0(train, class, trials, = 1, costs = NULL)```
+
+* _train_ is a data frame containing training data
+* _class_ is a factor vector with the class for each row in the training data
+* _trials_ is an optional number to control the number of boosting iterations (set to 1 by default)
+* _costs_ is an optional matrix specifying costs associated with various types.
+
+The function will return a C5.0 model object that can be used to make predictions.
+
+**Making predictions:**
+
+```p <- predict(m, test, type = "class")```
+
+* _m_ is a model trained by the C5.0 function
+* _test_ is a data frame containing test data with the same features as the training data used to build the classifier
+* _type_ is either "class" or "prob" and specifies whether the predictions should be the most probable class or the raw predicted probabilities
+
+The function will return a vector of predicted class values or raw predicted probabilities depending upon the value of the **type** parameter.
+
+Since the _default_ class variable is to be predicted, it must be excluded from the training data frame but supplied as the target factor vector for classification:
+```{r credit_model}
+library(C50)
+credit_model <- C5.0(credit_train[-17], credit_train$default)
+credit_model
+```
+
+The output shows some simple facts about the tree, including the function call that generated it, the number of features (labeled _predictors_), and examples (labeled _samples_) used to grow the tree.  The tree size indicates the decision depth of the tree.  The _summary()_ function shows the tree's decisions:
+```{r tree_summary}
+summary(credit_model)
+```
+
+The summary output shows some of the first branches in the decision tree.  The first three lines could be represented in plain language as:
+
+1. If the checking account balance is unknown or greater than 200 DM, then classify as "not likely to default."
+2. Otherwise, if the checking account balance is lees than 0 DM or between 1 and 200 DM.
+3. And the credit history is perfect or very good, then classify as "likely to default."
+
+The numbers in parentheses indicate the number of examples meeting the criteria for that decision, and the number incorrectly classified by the decision.  For instance, on the first line, 412/50 indicates that of the 412 examples reaching the decision, 50 were incorrectly classified as not likely to default.  In other words, 50 applicants actually defaulted in spite of the model's prediction to the contrary.
+
+After the tree, the ```summary(credit_model)``` output displays a confusion matrix, which is a cross-tabulation that indicates the model's incorrectly classified records in the training data.  The _Errors_ output notes that the model correctly classified all but 133 of the 900 training instances for an error rate of 14.8%.  A total of 35 actual _no_ values were incorrectly classified as _ues_ (false positives), while 98 _yes_ values were misclassified as _no_ (false negatives).
+
+## Step 4 - evaluating model performance
+
+Use the _predict()_ function now on the test dataset:
+```{r tree_predict}
+credit_pred <- predict(credit_model, credit_test)
+```
+
+This creates a vector pf predicted class values, which can be compared to the actual class values using the _CrossTable()_ function; the row and column percentages have been suppressed:
+```{r predictions}
+library(gmodels)
+CrossTable(credit_test$default,
+           credit_pred,
+           prop.chisq = FALSE,
+           prop.c = FALSE,
+           prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+
+## Step 5 - improving model performance
+
+The model's error rate is likely to be too high to deploy it in a real-time credit scoring application.  In fact, if the model had predicted "no default" for every test case, it would have been correct 67% of the time - a result not much worse than the model's but requiring much less effort.  Making matters even worse, the model performed especially poorly at identifying applicants who do default on their loans.
+
+### Boosting the accuracy of decision trees
+
+Using **adaptive boosting**, a process in which many decision trees are built and the trees vote on the best class for each example, the model can be improved.  Boosting is rooted in the notion that by combining a number of weak performing learners, a team that is much stronger than any of the learners alone can be created.  Each of the models has a unique set of strengths and weaknesses and they may be better or worse in solving certain problems.  Using a combination of several learners with complementary strengths and weaknesses can therefore dramatically improve the accuracy of a classifier.
+
+By adding an additional ```trials``` parameter indicating the number of separate decision trees to use in the boosted team and setting an upper limit, the algorithm will stop adding trees if it recognizes that additional trials do not seem to be improving the accuracy.
+```{r trials}
+credit_boost10 <- C5.0(credit_train[-17],
+                       credit_train$default,
+                       trials = 10)
+```
+
+While examining the resulting model, some additional lines have been added, indicating the changes:
+```{r trials_results}
+credit_boost10
+```
+
+So the tree size has shrunk.  All 10 trees, along with the model's performance, can be summarized:
+```{r trials_summary}
+summary(credit_boost10)
+```
+
+The classifier made 34 mistakes on 900 training examples for an error rate of 3.8%, which is quite an improvement over the 13.9% training error rate noted before adding boosting.  Now see if the improvement are realized in the test data:
+```{r trials_test}
+credit_boost_pred10 <- predict(credit_boost10, credit_test)
+CrossTable(credit_test$default,
+           credit_boost_pred10,
+           prop.chisq = FALSE,
+           prop.c = FALSE,
+           prop.r = FALSE,
+           dnn = c("actual default", "predicted default"))
+```
+
+The total error rate was reduced from 27% prior to boosting down to 18% in the boosted model but the model is still not doing well at predicting defaults, predicting only 20/33 = 61% correctly.  The lack of an even greater improvement may be a function of the relatively small training dataset or it may just be a very difficult problem to solve.
+
+This said, if boosting can be added this easily, why not apply it all the time?  Two reasons:
+
+1. building one decision tree can be computationally expensive and building many trees may be impractical
+2. if the training data is very noisy, then boosting might not result in an improvement at all
+
+### Making mistakes more costlier than others
+
+Giving a loan out to an applicant who is likely to default can be an expensive mistake.  One solution to reduce the number of false negatives may be to reject a larger number of borderline applicant, under the assumption that the interest the bank would earn from a risky loan is far outweighed by the massive loss it would incur if the money is not paid back at all.
+
+The C5.0 algorithm allows the assignment of a penalty to different types of errors, in order to discourage a tree from making more costly mistakes.  The penalties are designated in a **cost matrix**, which specifies how much costlier each error is, relative to any other prediction.
+
+To begin constructing the cost matrix, start by specifying the dimensions.  Since the predicted and actual values can both take two values, _yes_ or _no_, a 2x2 matrix is needed, using a list of two vectors, each with two values.  Giving names to the matrix dimensions will avoid later confusion.
+
+```{r cost_matrix}
+matrix_dimensions <- list(c("no", "yes"), c("no", "yes"))
+names(matrix_dimensions) <- c("predicted", "actual")
+```
+
+Next, assign the penalty for the various types of errors by supplying four values to fill the matrix, like so:
+
+* Predicted no, actual no
+* Predicted yes, actual no
+* Predicted no, actual yes
+* Predicted yes, actual yes
+
+Suppose the theory is that a loan default costs the bank four times as much as a missed opportunity.  The penalty values would then be defined as:
+```{r error_cost}
+error_cost <- matrix(c(0, 1, 4, 0), nrow = 2, dimnames = matrix_dimensions)
+```
+
+As defined by this matrix, there is no cost assigned when the algorithm classifies a _no_ or _yes_ correctly, but a false negative has a cost of 4 versus a false positive's cost of 1.  Apply this now to the existing data:
+```{r cost_predict}
+# apply the cost matrix to the tree
+credit_cost <- C5.0(credit_train[-17], 
+                    credit_train$default,
+                    costs = error_cost)
+
+credit_cost_pred <- predict(credit_cost, credit_test)
+
+CrossTable(credit_test$default, 
+           credit_cost_pred,
+           prop.chisq = FALSE, 
+           prop.c = FALSE, 
+           prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+
+Compared to the boosted model, this version makes more mistakes overall:  37% error versus 18% in the boosted case.  However, the types of mistakes are very different.  There the previous models incorrectly classified only 42 and 61% of defaults correctly, in this model, 79% of the actual defaults were predicted to be non-defaults.  This trade resulting in a reduction of false negatives at the expense of increasing false positives may be acceptable if our cost estimates were accurate.
+
+# Understanding classification rules
+Classification rules represent knowledge in the form of logical if-else statements that assign a class to unlabeled examples.  They are specified in terms of an **antecedent** and a **consequent**; these form a hypothesis stating that "if this happens, then that happens.", such as a hard drive clicking means that it will fail soon.  The antecedent comprises certain combinations of feature values, while the consequent specifies the class value to assign when the rule's conditions are met.
+
+Rule learners are often used in a manner similar to decision tree learners.  Like decision trees, they can be used for applications that generate knowledge for future action, such as:
+
+* Identifying conditions that lead to a hardware failure in mechanical devices
+* Describing the key characteristics of groups of people for customer segmentation
+* Finding conditions that precede large drops or increases in the prices of shares on the stock market
+
+On the other hand, rule learners offer some distinct advantages over trees for some tasks.  Unlike a tree, which must be applied from top-to-bottom through a series of decisions, rules are propositions that can be read much like a statement of fact.  Additionally, the results of a rule learner can be more simple, direct, and easier to understand than a decision tree built on the same data.
+
+Rule learners are generally applied to problems where the features are primarily or entirely nominal.  They do well at identifying rare events, even if the rare event occurs only for a very specific interaction among feature values.
+
+# Separate and conquer
+Classification rule learning algorithms utilize a heuristic known as **separate and conquer**.  The process involves identifying a rule that covers a subset of examples in the training data, and then separating this partition from the remaining data.  As the rules are added, additional subsets of the data are separated until the entire dataset has been covered and no more examples remain.
+
+One way to imagine the rule learning process is to think about drilling down into the data by creating increasingly specific rules to identify class values.  To identify whether or not an animal is a mammal, the set of all animals can be depicted as a large space.  A rule learner begins by using the available features to find homogeneous groups.  For example, using a feature that indicates whether the species travels via land, sea, or air. the first rule might suggest that any land-based animals are mammals.  But the rule might include animals like frogs, which are not mammals.  A more specific rule would state that mammals must walk on land and have a tail.  An additional rule might require that to be classified as a mammal, the animal must have fur.  And so on.  This shows how rules gradually consume larger and larger segments of data to eventually classify all instances.
+
+As the rules seem to cover portions of the data, separate and conquer algorithms are also known as **covering algorithms**, and the resulting rules are called **covering rules**.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
