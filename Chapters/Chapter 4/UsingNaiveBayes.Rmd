@@ -422,8 +422,3 @@ This document discussed classification using Naive Bayes, so named because it is
 
 
 
-
-
-
-
-

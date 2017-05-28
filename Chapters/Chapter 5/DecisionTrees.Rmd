@@ -310,8 +310,67 @@ One way to imagine the rule learning process is to think about drilling down int
 
 As the rules seem to cover portions of the data, separate and conquer algorithms are also known as **covering algorithms**, and the resulting rules are called **covering rules**.
 
+# The 1R Algorithm
 
+The simplest classifier, **ZeroR**, is a rule learner that literally learns no rules (hence the name).  For every unlabeled example, regardless of the values of its features, it predicts the most common class.
 
+The **1R algorithm** (**One Rule** or **OneR**) improves over ZeroR by selecting a single rule.  The way this algorithm works is simple.  For each feature, 1R divides the data into groups based on similar values of the feature.  Then, for each segment, the algorithm predicts the majority class.  The error rate for the rule based on each feature is calculated and the rule with the fewest errors is chosen as the one rule.  Obviously, this rule learning algorithm may be too basic for some tasks, such as considering only a single symptom in a medical diagnosis system.
+
+# The RIPPER algorithm
+Early rule learning algorithms were plagued by a couple of problems.  First, they were notorious for being slow, which made them ineffective for the increasing number of large datasets.  Secondly, they were often prone to being inaccurate on noisy data.
+
+A first step was the **Incremental Reduced Error Pruning (IREP) algorithm** which uses a combination of pre-pruning and post-pruning methods that grow very complex rules and prune them before separating the instances from the full dataset.  Although this strategy helped the performance of rule learners, decision trees often still performed better.
+
+The **Repeated Incremental Pruning to Produce Error Reduction (RIPPER) algorithm** improved upon IREP to generate rules that match or exceed the performance of decision trees.  Having evolved from several iterations of rule learning algorithms, the RIPPER algorithm is a patchwork of efficient heuristics for rule learning.  It can be understood in general terms as a three-step process:
+
+1. Grow
+2. Prune
+3. Optimize
+
+The growing phase uses the separate and conquer technique to greedily add conditions to a rule until it perfectly classifies a subset of data or runs out of attributes for splitting.  Similar to decision trees, the information gain criterion is used to identify the next splitting attribute.  When increasing a rule's specificity no longer reduces entropy, the rule is immediately pruned.  Steps one and two are repeated until it reaches a stopping criterion, at which point the entire set of rules is optimized using a variety of heuristics.
+
+# Rules from decision trees
+Classification rules can also be obtained directly from decision trees.  Beginning at a leaf node and following the branches back to the root results in a series of decisions.  These can be combined into a single rule.  The chief downside to using a decision tree to generate rules is that the resulting rules are often more complex than those learned by a rule learning algorithm.  The divide and conquer strategy employed by decision trees biases the results differently than that of a rule learner.  On the other hand, it is sometimes more computationally efficient to generate rules from trees.  The ```C5.0``` function will generate a model using classification rules if you specify ```rules = TRUE``` when training the model.
+
+# What makes trees and rules greedy?
+Decision trees and rule learners are known as **greedy learners** because they use data on a first-come, first-served basis.  Both the divide and conquer heuristic used by decision trees and the separate and conquer heuristic used by rule learners attempt to make partitions one at at time, finding the most homogeneous partition first. followed by the next best, and so on, until all examples have been classified.
+
+The downside to the greedy approach is that greedy algorithms are not guaranteed to generate the optimal, most accurate, or smallest number of rules for a particular dataset.  By taking the low-hanging fruit early, a greedy learner may quickly find a single rule that is accurate for one subset of data; however, in doing so, the learner may miss the opportunity to develop a more nuanced set of rules with better overall accuracy on the entire set of data.  However, without using the greedy approach to rule learning, it is likely that for all but the smallest of datasets, rule learning would be computationally infeasible.
+
+Though both trees and rules employ greedy learning heuristics, there are subtle differences in how they build rules.  Perhaps the best way to distinguish them is to note that once divide and conquer splits on a feature, the partitions created by the split may not be re-conquered, only further subdivided.  In this way, a tree is permanently limited by its history of past decisions.  In contrast, once separate and conquer finds a rule, any examples not covered by all of the rule's conditions may be re-conquered.
+
+# Example - identifying poisonouse mushrooms with rule learners
+Unlike the identification of harmful plants such as poison oak or poison ivy, there are no clear rules to identify whether a wild mushroom is poisonous or edible.  If simple, clear, and consistent rules were available to identify poisonous mushrooms, they could save the lives of foragers.
+
+## Step 1 - collecting the data
+
+The dataset used includes information on 8,124 mushroom samples from 23 species of gilled mushrooms and consists of two classes:  poisonous and non-poisonous.
+
+## Step 2 - exploring and preparing the data
+
+Since all the 22 features and the target class are nominal, use ```stringsAsFactors``` equal to **TRUE**.
+```{r read_mushrooms}
+mushrooms <- read.csv("mushrooms.csv", stringsAsFactors = TRUE)
+```
+
+Looking at the output of ```str()```, one feature is worth mentioning: the _veil_type_ variable:
+```{r veil_type}
+str(mushrooms)
+```
+
+It is a factor with one level, however the data dictionary lists two levels for this feature: partial and universal.  Since all the examples in our data are classified as partial, it is likely that this data element was somehow coded incorrectly.  It probably does not provide any useful information for prediction and can safely be removed:
+```{r drop_veil}
+mushrooms$veil_color <- NULL
+```
+
+Looking at the distribution of mushrooms types: 
+```{r mushroom_types}
+table(mushrooms$type)
+```
+
+shows that about 52% of the mushroom samples are edible, while 48% are poisonous. 
+
+For the purposes of this example, consider that the 8,214 samples in the mushroom data to be an exhaustive set of all the possible wild mushrooms.  This is an important assumption, because it means that no samples out of the training data will be pulled for testing purposes.  No effort is made to develop rules that cover unforeseen types of mushrooms; the goal here is to find rules that accurately depict the complete set of known mushroom types.  Therefore the model can be built and tested on the same data.
 
 
 

@@ -173,6 +173,14 @@ $(document).ready(function () {
 </ul></li>
 <li><a href="#understanding-classification-rules"><span class="toc-section-number">5</span> Understanding classification rules</a></li>
 <li><a href="#separate-and-conquer"><span class="toc-section-number">6</span> Separate and conquer</a></li>
+<li><a href="#the-1r-algorithm"><span class="toc-section-number">7</span> The 1R Algorithm</a></li>
+<li><a href="#the-ripper-algorithm"><span class="toc-section-number">8</span> The RIPPER algorithm</a></li>
+<li><a href="#rules-from-decision-trees"><span class="toc-section-number">9</span> Rules from decision trees</a></li>
+<li><a href="#what-makes-trees-and-rules-greedy"><span class="toc-section-number">10</span> What makes trees and rules greedy?</a></li>
+<li><a href="#example---identifying-poisonouse-mushrooms-with-rule-learners"><span class="toc-section-number">11</span> Example - identifying poisonouse mushrooms with rule learners</a><ul>
+<li><a href="#step-1---collecting-the-data"><span class="toc-section-number">11.1</span> Step 1 - collecting the data</a></li>
+<li><a href="#step-2---exploring-and-preparing-the-data"><span class="toc-section-number">11.2</span> Step 2 - exploring and preparing the data</a></li>
+</ul></li>
 </ul>
 </div>
 
@@ -348,7 +356,7 @@ credit_model</code></pre></div>
 ## C5.0.default(x = credit_train[-17], y = credit_train$default)
 ## 
 ## 
-## C5.0 [Release 2.07 GPL Edition]      Tue May 23 12:51:46 2017
+## C5.0 [Release 2.07 GPL Edition]      Sun May 28 11:53:42 2017
 ## -------------------------------
 ## 
 ## Class specified by attribute `outcome'
@@ -570,7 +578,7 @@ credit_model</code></pre></div>
 ## C5.0.default(x = credit_train[-17], y = credit_train$default, trials = 10)
 ## 
 ## 
-## C5.0 [Release 2.07 GPL Edition]      Tue May 23 12:51:46 2017
+## C5.0 [Release 2.07 GPL Edition]      Sun May 28 11:53:42 2017
 ## -------------------------------
 ## 
 ## Class specified by attribute `outcome'
@@ -1688,6 +1696,75 @@ credit_cost_pred &lt;-<span class="st"> </span><span class="kw">predict</span>(c
 <p>Classification rule learning algorithms utilize a heuristic known as <strong>separate and conquer</strong>. The process involves identifying a rule that covers a subset of examples in the training data, and then separating this partition from the remaining data. As the rules are added, additional subsets of the data are separated until the entire dataset has been covered and no more examples remain.</p>
 <p>One way to imagine the rule learning process is to think about drilling down into the data by creating increasingly specific rules to identify class values. To identify whether or not an animal is a mammal, the set of all animals can be depicted as a large space. A rule learner begins by using the available features to find homogeneous groups. For example, using a feature that indicates whether the species travels via land, sea, or air. the first rule might suggest that any land-based animals are mammals. But the rule might include animals like frogs, which are not mammals. A more specific rule would state that mammals must walk on land and have a tail. An additional rule might require that to be classified as a mammal, the animal must have fur. And so on. This shows how rules gradually consume larger and larger segments of data to eventually classify all instances.</p>
 <p>As the rules seem to cover portions of the data, separate and conquer algorithms are also known as <strong>covering algorithms</strong>, and the resulting rules are called <strong>covering rules</strong>.</p>
+</div>
+<div id="the-1r-algorithm" class="section level1">
+<h1><span class="header-section-number">7</span> The 1R Algorithm</h1>
+<p>The simplest classifier, <strong>ZeroR</strong>, is a rule learner that literally learns no rules (hence the name). For every unlabeled example, regardless of the values of its features, it predicts the most common class.</p>
+<p>The <strong>1R algorithm</strong> (<strong>One Rule</strong> or <strong>OneR</strong>) improves over ZeroR by selecting a single rule. The way this algorithm works is simple. For each feature, 1R divides the data into groups based on similar values of the feature. Then, for each segment, the algorithm predicts the majority class. The error rate for the rule based on each feature is calculated and the rule with the fewest errors is chosen as the one rule. Obviously, this rule learning algorithm may be too basic for some tasks, such as considering only a single symptom in a medical diagnosis system.</p>
+</div>
+<div id="the-ripper-algorithm" class="section level1">
+<h1><span class="header-section-number">8</span> The RIPPER algorithm</h1>
+<p>Early rule learning algorithms were plagued by a couple of problems. First, they were notorious for being slow, which made them ineffective for the increasing number of large datasets. Secondly, they were often prone to being inaccurate on noisy data.</p>
+<p>A first step was the <strong>Incremental Reduced Error Pruning (IREP) algorithm</strong> which uses a combination of pre-pruning and post-pruning methods that grow very complex rules and prune them before separating the instances from the full dataset. Although this strategy helped the performance of rule learners, decision trees often still performed better.</p>
+<p>The <strong>Repeated Incremental Pruning to Produce Error Reduction (RIPPER) algorithm</strong> improved upon IREP to generate rules that match or exceed the performance of decision trees. Having evolved from several iterations of rule learning algorithms, the RIPPER algorithm is a patchwork of efficient heuristics for rule learning. It can be understood in general terms as a three-step process:</p>
+<ol style="list-style-type: decimal">
+<li>Grow</li>
+<li>Prune</li>
+<li>Optimize</li>
+</ol>
+<p>The growing phase uses the separate and conquer technique to greedily add conditions to a rule until it perfectly classifies a subset of data or runs out of attributes for splitting. Similar to decision trees, the information gain criterion is used to identify the next splitting attribute. When increasing a rule’s specificity no longer reduces entropy, the rule is immediately pruned. Steps one and two are repeated until it reaches a stopping criterion, at which point the entire set of rules is optimized using a variety of heuristics.</p>
+</div>
+<div id="rules-from-decision-trees" class="section level1">
+<h1><span class="header-section-number">9</span> Rules from decision trees</h1>
+<p>Classification rules can also be obtained directly from decision trees. Beginning at a leaf node and following the branches back to the root results in a series of decisions. These can be combined into a single rule. The chief downside to using a decision tree to generate rules is that the resulting rules are often more complex than those learned by a rule learning algorithm. The divide and conquer strategy employed by decision trees biases the results differently than that of a rule learner. On the other hand, it is sometimes more computationally efficient to generate rules from trees. The <code>C5.0</code> function will generate a model using classification rules if you specify <code>rules = TRUE</code> when training the model.</p>
+</div>
+<div id="what-makes-trees-and-rules-greedy" class="section level1">
+<h1><span class="header-section-number">10</span> What makes trees and rules greedy?</h1>
+<p>Decision trees and rule learners are known as <strong>greedy learners</strong> because they use data on a first-come, first-served basis. Both the divide and conquer heuristic used by decision trees and the separate and conquer heuristic used by rule learners attempt to make partitions one at at time, finding the most homogeneous partition first. followed by the next best, and so on, until all examples have been classified.</p>
+<p>The downside to the greedy approach is that greedy algorithms are not guaranteed to generate the optimal, most accurate, or smallest number of rules for a particular dataset. By taking the low-hanging fruit early, a greedy learner may quickly find a single rule that is accurate for one subset of data; however, in doing so, the learner may miss the opportunity to develop a more nuanced set of rules with better overall accuracy on the entire set of data. However, without using the greedy approach to rule learning, it is likely that for all but the smallest of datasets, rule learning would be computationally infeasible.</p>
+<p>Though both trees and rules employ greedy learning heuristics, there are subtle differences in how they build rules. Perhaps the best way to distinguish them is to note that once divide and conquer splits on a feature, the partitions created by the split may not be re-conquered, only further subdivided. In this way, a tree is permanently limited by its history of past decisions. In contrast, once separate and conquer finds a rule, any examples not covered by all of the rule’s conditions may be re-conquered.</p>
+</div>
+<div id="example---identifying-poisonouse-mushrooms-with-rule-learners" class="section level1">
+<h1><span class="header-section-number">11</span> Example - identifying poisonouse mushrooms with rule learners</h1>
+<p>Unlike the identification of harmful plants such as poison oak or poson ivy, there are no clear rules to identify whether a wild mushroom is posonous or edible. If simple, clear, and consisten rules were available to identify poisonous mushrooms, they could save the lives of foragers.</p>
+<div id="step-1---collecting-the-data" class="section level2">
+<h2><span class="header-section-number">11.1</span> Step 1 - collecting the data</h2>
+<p>The dataset used includes information on 8,124 mushroom samples from 23 species of gilled mushrooms and consists of two classes: poisonous and non-poisonous.</p>
+</div>
+<div id="step-2---exploring-and-preparing-the-data" class="section level2">
+<h2><span class="header-section-number">11.2</span> Step 2 - exploring and preparing the data</h2>
+<p>Since all the 22 features and the target class are nominal, use <code>stringsAsFactors</code> equal to <strong>TRUE</strong>.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mushrooms &lt;-<span class="st"> </span><span class="kw">read.csv</span>(<span class="st">&quot;mushrooms.csv&quot;</span>, <span class="dt">stringsAsFactors =</span> <span class="ot">TRUE</span>)</code></pre></div>
+<p>Looking at the output of <code>str()</code>, one feature is worth mentioning: the <em>veil_type</em> variable:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">str</span>(mushrooms)</code></pre></div>
+<pre><code>## 'data.frame':    8124 obs. of  23 variables:
+##  $ type                    : Factor w/ 2 levels &quot;edible&quot;,&quot;poisonous&quot;: 2 1 1 2 1 1 1 1 2 1 ...
+##  $ cap_shape               : Factor w/ 6 levels &quot;bell&quot;,&quot;conical&quot;,..: 3 3 1 3 3 3 1 1 3 1 ...
+##  $ cap_surface             : Factor w/ 4 levels &quot;fibrous&quot;,&quot;grooves&quot;,..: 4 4 4 3 4 3 4 3 3 4 ...
+##  $ cap_color               : Factor w/ 10 levels &quot;brown&quot;,&quot;buff&quot;,..: 1 10 9 9 4 10 9 9 9 10 ...
+##  $ bruises                 : Factor w/ 2 levels &quot;no&quot;,&quot;yes&quot;: 2 2 2 2 1 2 2 2 2 2 ...
+##  $ odor                    : Factor w/ 9 levels &quot;almond&quot;,&quot;anise&quot;,..: 8 1 2 8 7 1 1 2 8 1 ...
+##  $ gill_attachment         : Factor w/ 2 levels &quot;attached&quot;,&quot;free&quot;: 2 2 2 2 2 2 2 2 2 2 ...
+##  $ gill_spacing            : Factor w/ 2 levels &quot;close&quot;,&quot;crowded&quot;: 1 1 1 1 2 1 1 1 1 1 ...
+##  $ gill_size               : Factor w/ 2 levels &quot;broad&quot;,&quot;narrow&quot;: 2 1 1 2 1 1 1 1 2 1 ...
+##  $ gill_color              : Factor w/ 12 levels &quot;black&quot;,&quot;brown&quot;,..: 1 1 2 2 1 2 5 2 8 5 ...
+##  $ stalk_shape             : Factor w/ 2 levels &quot;enlarging&quot;,&quot;tapering&quot;: 1 1 1 1 2 1 1 1 1 1 ...
+##  $ stalk_root              : Factor w/ 5 levels &quot;bulbous&quot;,&quot;club&quot;,..: 3 2 2 3 3 2 2 2 3 2 ...
+##  $ stalk_surface_above_ring: Factor w/ 4 levels &quot;fibrous&quot;,&quot;scaly&quot;,..: 4 4 4 4 4 4 4 4 4 4 ...
+##  $ stalk_surface_below_ring: Factor w/ 4 levels &quot;fibrous&quot;,&quot;scaly&quot;,..: 4 4 4 4 4 4 4 4 4 4 ...
+##  $ stalk_color_above_ring  : Factor w/ 9 levels &quot;brown&quot;,&quot;buff&quot;,..: 8 8 8 8 8 8 8 8 8 8 ...
+##  $ stalk_color_below_ring  : Factor w/ 9 levels &quot;brown&quot;,&quot;buff&quot;,..: 8 8 8 8 8 8 8 8 8 8 ...
+##  $ veil_type               : Factor w/ 1 level &quot;partial&quot;: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ veil_color              : Factor w/ 4 levels &quot;brown&quot;,&quot;orange&quot;,..: 3 3 3 3 3 3 3 3 3 3 ...
+##  $ ring_number             : Factor w/ 3 levels &quot;none&quot;,&quot;one&quot;,&quot;two&quot;: 2 2 2 2 2 2 2 2 2 2 ...
+##  $ ring_type               : Factor w/ 5 levels &quot;evanescent&quot;,&quot;flaring&quot;,..: 5 5 5 5 1 5 5 5 5 5 ...
+##  $ spore_print_color       : Factor w/ 9 levels &quot;black&quot;,&quot;brown&quot;,..: 1 2 2 1 2 1 1 2 1 1 ...
+##  $ population              : Factor w/ 6 levels &quot;abundant&quot;,&quot;clustered&quot;,..: 4 3 3 4 1 3 3 4 5 4 ...
+##  $ habitat                 : Factor w/ 7 levels &quot;grasses&quot;,&quot;leaves&quot;,..: 5 1 3 5 1 1 3 3 1 3 ...</code></pre>
+<p>It is a factor with one level, however the data dictionary lists two levels for this feature: partial and universal. Since all the examples in our data are classified as partial, it is likely that this data element was somehow coded incorrectly. It probably does not provide any useful information for prediction and can safely be removed:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mushrooms$veil_color &lt;-<span class="st"> </span><span class="ot">NULL</span></code></pre></div>
+<p>Looking at thge distribution of mushrooms types: 4208, 3916</p>
+</div>
 </div>
 
 
