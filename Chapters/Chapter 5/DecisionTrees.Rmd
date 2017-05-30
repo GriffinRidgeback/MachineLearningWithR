@@ -372,16 +372,85 @@ shows that about 52% of the mushroom samples are edible, while 48% are poisonous
 
 For the purposes of this example, consider that the 8,214 samples in the mushroom data to be an exhaustive set of all the possible wild mushrooms.  This is an important assumption, because it means that no samples out of the training data will be pulled for testing purposes.  No effort is made to develop rules that cover unforeseen types of mushrooms; the goal here is to find rules that accurately depict the complete set of known mushroom types.  Therefore the model can be built and tested on the same data.
 
+## Step 3 - training a model on the data
+What would a hypothetical ZeroR classifier predict for this data?  Since ZeroR ignores all of the features and simply predicts the target's mode, its rule would state that all mushrooms are edible.  This is not a helpful classification.  Simple rules can often be extremely predictive, and the 1R classifier, which is a simple rule learner, can be used to identify the most predictive single feature of the target class and use it to construct a set of rules.  The 1R implementation to be used is found in the _RWeka_ package:
 
+**Building the classifier:**
+```m <- OneR(class ~ predictors, data = mydata)```
 
+where:
 
+* _class_ is the column in the **mydata** data frame to be predicted
+* _predictors_ is an R formula specifying the features in the **mydata** data frame to use for prediction
+* _data_ is the data frame in which **class** and *predictors** can be found
 
+The function will return a 1R model object that can be used to make predictions.
 
+**Making predictions**
+```p <- predict(m, test)```
 
+where:
 
+* _m_ is a model trained by the **OneR()** function
+* _test_ is a data frame containing test data with the same features as the training data used to build the classifier
 
+The function will return a vector of predicted class values.
 
+The _OneR()_ implementation uses the R formula syntax to specify the model to be trained, using the tilde to express the relationship between a target variable and its predictors.  The class variable to be learned goes to the left of the tilde, and the predictor features are written on the right, separated by + operators.  Example: _y ~ x1 + x2_.  The special case shown next uses all the predictors to arrive at a response variable: _y ~ ._, which specifies the relationship between _y_ and all the other features in the dataset.
+```{r 1R}
+library(RWeka)
+mushroom_1R <- OneR(type ~ ., data = mushrooms) 
+```
 
+To examine the rules it created, type the name of the classifier object:
+```{r examine_results}
+mushroom_1R
+```
+
+the first line of the output shows that the _odor_ feature was selected for rule generation.  The categories of odor, such as almond, anise, and so on, specify rules for whether the mushroom is likely to be edible or poisonous.  If the mushroom has a fishy or foul odor, it is likely to be poisonous.  On the other hand, if it smells like an almond or has no perceived smell, it is likely to be edible.  These rules could be summarized by saying if it smells bad, don't eat it!
+
+## Step 4 - evaluation model performance
+The last line of the output notes that the rules correctly predicted the edibility of 8,004 of the 8,124 mushrooms or nearly 99% of the mushroom samples.  More details are available via _summary()_:
+```{r rule_summary}
+summary(mushroom_1R)
+```
+Examining the table, it is evident that while the 1R classifier did not classify any edible mushrooms as poisonous, it did classify 120 poisonous mushrooms as edible!  By trying to add a few more rules, perhaps an even better classifier can be developed.
+
+## Step 5 - improving model performance
+For a more sophisticated rule learner, the **RWeka** package includes _JRip()_, a Java-based implementation of the RIPPER rule learning algorithm.
+
+**Building the classifier**
+
+```m <- JRip(class ~ predictors, data = mydata)```
+
+where:
+
+* _class_ is the column in the **mydata** data frame to be predicted
+* _predictors_ is an $ formula specifying the features in the **mydata** data frame to use for prediction
+* _data_ is the data frame in which **class** and **predictors** can be found
+
+The function will return a RIPPER model object that can be used to make predictions.
+
+**Making predictions:**
+
+```p <- predict(m, test)```
+
+where:
+
+* _m_ is a model trained by the **JRip()** function
+* _test_ is a data frame containing test data with the same features as the training data used to build the classifier
+
+The function will return a vector of predicted class values.
+
+Train the JRip() rule learner in the same way as with OneR(), allowing it to choose rules from all the available features:
+```{r jrip}
+mushroom_JRip <- JRip(type ~ ., data = mushrooms)
+mushroom_JRip
+```
+
+An easy way to read these rules is to think of them as a list of if-else statements, similar to programming logic.  The ninth rule implies that any mushroom sample that was not covered by the preceding eight rules is edible; this would be the 'else' clause.
+
+The numbers next to each rule indicate the number of instances covered by the rule and a count of misclassified instances.  Notably, there were no misclassified mushrooms samples using these nine rules.  As a result, the number of instance covered by the last rule is exactly equal to the number of edible mushrooms in the data.
 
 
 

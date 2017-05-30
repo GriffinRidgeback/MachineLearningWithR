@@ -180,6 +180,9 @@ $(document).ready(function () {
 <li><a href="#example---identifying-poisonouse-mushrooms-with-rule-learners"><span class="toc-section-number">11</span> Example - identifying poisonouse mushrooms with rule learners</a><ul>
 <li><a href="#step-1---collecting-the-data"><span class="toc-section-number">11.1</span> Step 1 - collecting the data</a></li>
 <li><a href="#step-2---exploring-and-preparing-the-data"><span class="toc-section-number">11.2</span> Step 2 - exploring and preparing the data</a></li>
+<li><a href="#step-3---training-a-model-on-the-data-1"><span class="toc-section-number">11.3</span> Step 3 - training a model on the data</a></li>
+<li><a href="#step-4---evaluation-model-performance"><span class="toc-section-number">11.4</span> Step 4 - evaluation model performance</a></li>
+<li><a href="#step-5---improving-model-performance-1"><span class="toc-section-number">11.5</span> Step 5 - improving model performance</a></li>
 </ul></li>
 </ul>
 </div>
@@ -356,7 +359,7 @@ credit_model</code></pre></div>
 ## C5.0.default(x = credit_train[-17], y = credit_train$default)
 ## 
 ## 
-## C5.0 [Release 2.07 GPL Edition]      Sun May 28 11:53:42 2017
+## C5.0 [Release 2.07 GPL Edition]      Tue May 30 15:14:36 2017
 ## -------------------------------
 ## 
 ## Class specified by attribute `outcome'
@@ -578,7 +581,7 @@ credit_model</code></pre></div>
 ## C5.0.default(x = credit_train[-17], y = credit_train$default, trials = 10)
 ## 
 ## 
-## C5.0 [Release 2.07 GPL Edition]      Sun May 28 11:53:42 2017
+## C5.0 [Release 2.07 GPL Edition]      Tue May 30 15:14:36 2017
 ## -------------------------------
 ## 
 ## Class specified by attribute `outcome'
@@ -1726,7 +1729,7 @@ credit_cost_pred &lt;-<span class="st"> </span><span class="kw">predict</span>(c
 </div>
 <div id="example---identifying-poisonouse-mushrooms-with-rule-learners" class="section level1">
 <h1><span class="header-section-number">11</span> Example - identifying poisonouse mushrooms with rule learners</h1>
-<p>Unlike the identification of harmful plants such as poison oak or poson ivy, there are no clear rules to identify whether a wild mushroom is posonous or edible. If simple, clear, and consisten rules were available to identify poisonous mushrooms, they could save the lives of foragers.</p>
+<p>Unlike the identification of harmful plants such as poison oak or poison ivy, there are no clear rules to identify whether a wild mushroom is poisonous or edible. If simple, clear, and consistent rules were available to identify poisonous mushrooms, they could save the lives of foragers.</p>
 <div id="step-1---collecting-the-data" class="section level2">
 <h2><span class="header-section-number">11.1</span> Step 1 - collecting the data</h2>
 <p>The dataset used includes information on 8,124 mushroom samples from 23 species of gilled mushrooms and consists of two classes: poisonous and non-poisonous.</p>
@@ -1763,7 +1766,111 @@ credit_cost_pred &lt;-<span class="st"> </span><span class="kw">predict</span>(c
 ##  $ habitat                 : Factor w/ 7 levels &quot;grasses&quot;,&quot;leaves&quot;,..: 5 1 3 5 1 1 3 3 1 3 ...</code></pre>
 <p>It is a factor with one level, however the data dictionary lists two levels for this feature: partial and universal. Since all the examples in our data are classified as partial, it is likely that this data element was somehow coded incorrectly. It probably does not provide any useful information for prediction and can safely be removed:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mushrooms$veil_color &lt;-<span class="st"> </span><span class="ot">NULL</span></code></pre></div>
-<p>Looking at thge distribution of mushrooms types: 4208, 3916</p>
+<p>Looking at the distribution of mushrooms types:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">table</span>(mushrooms$type)</code></pre></div>
+<pre><code>## 
+##    edible poisonous 
+##      4208      3916</code></pre>
+<p>shows that about 52% of the mushroom samples are edible, while 48% are poisonous.</p>
+<p>For the purposes of this example, consider that the 8,214 samples in the mushroom data to be an exhaustive set of all the possible wild mushrooms. This is an important assumption, because it means that no samples out of the training data will be pulled for testing purposes. No effort is made to develop rules that cover unforeseen types of mushrooms; the goal here is to find rules that accurately depict the complete set of known mushroom types. Therefore the model can be built and tested on the same data.</p>
+</div>
+<div id="step-3---training-a-model-on-the-data-1" class="section level2">
+<h2><span class="header-section-number">11.3</span> Step 3 - training a model on the data</h2>
+<p>What would a hypothetical ZeroR classifier predict for this data? Since ZeroR ignores all of the features and simply predicts the target’s mode, its rule would state that all mushrooms are edible. This is not a helpful classification. Simple rules can often be extremely predictive, and the 1R classifier, which is a simple rule learner, can be used to identify the most predictive single feature of the target class and use it to construct a set of rules. The 1R implementation to be used is found in the <em>RWeka</em> package:</p>
+<p><strong>Building the classifier:</strong> <code>m &lt;- OneR(class ~ predictors, data = mydata)</code></p>
+<p>where:</p>
+<ul>
+<li><em>class</em> is the column in the <strong>mydata</strong> data frame to be predicted</li>
+<li><em>predictors</em> is an R formula specifying the features in the <strong>mydata</strong> data frame to use for prediction</li>
+<li><em>data</em> is the data frame in which <strong>class</strong> and *predictors** can be found</li>
+</ul>
+<p>The function will return a 1R model object that can be used to make predictions.</p>
+<p><strong>Making predictions</strong> <code>p &lt;- predict(m, test)</code></p>
+<p>where:</p>
+<ul>
+<li><em>m</em> is a model trained by the <strong>OneR()</strong> function</li>
+<li><em>test</em> is a data frame containing test data with the same features as the training data used to build the classifier</li>
+</ul>
+<p>The function will return a vector of predicted class values.</p>
+<p>The <em>OneR()</em> implementation uses the R formula syntax to specify the model to be trained, using the tilde to express the relationship between a target variable and its predictors. The class variable to be learned goes to the left of the tilde, and the predictor features are written on the right, separated by + operators. Example: <em>y ~ x1 + x2</em>. The special case shown next uses all the predictors to arrive at a response variable: <em>y ~ .</em>, which specifies the relationship between <em>y</em> and all the other features in the dataset.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(RWeka)
+mushroom_1R &lt;-<span class="st"> </span><span class="kw">OneR</span>(type ~<span class="st"> </span>., <span class="dt">data =</span> mushrooms) </code></pre></div>
+<p>To examine the rules it created, type the name of the classifier object:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mushroom_1R</code></pre></div>
+<pre><code>## odor:
+##  almond  -&gt; edible
+##  anise   -&gt; edible
+##  creosote    -&gt; poisonous
+##  fishy   -&gt; poisonous
+##  foul    -&gt; poisonous
+##  musty   -&gt; poisonous
+##  none    -&gt; edible
+##  pungent -&gt; poisonous
+##  spicy   -&gt; poisonous
+## (8004/8124 instances correct)</code></pre>
+<p>the first line of the output shows that the <em>odor</em> feature was selected for rule generation. The categories of odor, such as almond, anise, and so on, specify rules for whether the mushroom is likely to be edible or poisonous. If the mushroom has a fishy or foul odor, it is likely to be poisonous. On the other hand, if it smells like an almond or has no perceived smell, it is likely to be edible. These rules could be summarized by saying if it smells bad, don’t eat it!</p>
+</div>
+<div id="step-4---evaluation-model-performance" class="section level2">
+<h2><span class="header-section-number">11.4</span> Step 4 - evaluation model performance</h2>
+<p>The last line of the output notes that the rules correctly predicted the edibility of 8,004 of the 8,124 mushrooms or nearly 99% of the mushroom samples. More details are available via <em>summary()</em>:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">summary</span>(mushroom_1R)</code></pre></div>
+<pre><code>## 
+## === Summary ===
+## 
+## Correctly Classified Instances        8004               98.5229 %
+## Incorrectly Classified Instances       120                1.4771 %
+## Kappa statistic                          0.9704
+## Mean absolute error                      0.0148
+## Root mean squared error                  0.1215
+## Relative absolute error                  2.958  %
+## Root relative squared error             24.323  %
+## Total Number of Instances             8124     
+## 
+## === Confusion Matrix ===
+## 
+##     a    b   &lt;-- classified as
+##  4208    0 |    a = edible
+##   120 3796 |    b = poisonous</code></pre>
+<p>Examining the table, it is evident that while the 1R classifier did not classify any edible mushrooms as poisonous, it did classify 120 poisonous mushrooms as edible! By trying to add a few more rules, perhaps an even better classifier can be developed.</p>
+</div>
+<div id="step-5---improving-model-performance-1" class="section level2">
+<h2><span class="header-section-number">11.5</span> Step 5 - improving model performance</h2>
+<p>For a more sophisticated rule learner, the <strong>RWeka</strong> package includes <em>JRip()</em>, a Java-based implementation of the RIPPER rule learning algorithm.</p>
+<p><strong>Building the classifier</strong></p>
+<p><code>m &lt;- JRip(class ~ predictors, data = mydata)</code></p>
+<p>where:</p>
+<ul>
+<li><em>class</em> is the column in the <strong>mydata</strong> data frame to be predicted</li>
+<li><em>predictors</em> is an $ formula specifying the features in the <strong>mydata</strong> data frame to use for prediction</li>
+<li><em>data</em> is the data frame in which <strong>class</strong> and <strong>predictors</strong> can be found</li>
+</ul>
+<p>The function will return a RIPPER model object that can be used to make predictions.</p>
+<p><strong>Making predictions:</strong></p>
+<p><code>p &lt;- predict(m, test)</code></p>
+<p>where:</p>
+<ul>
+<li><em>m</em> is a model trained by the <strong>JRip()</strong> function</li>
+<li><em>test</em> is a data frame containing test data with the same features as the training data used to build the classifier</li>
+</ul>
+<p>The function will return a vector of predicted class values.</p>
+<p>Train the JRip() rule learner in the same way as with OneR(), allowing it to choose rules from all the available features:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mushroom_JRip &lt;-<span class="st"> </span><span class="kw">JRip</span>(type ~<span class="st"> </span>., <span class="dt">data =</span> mushrooms)
+mushroom_JRip</code></pre></div>
+<pre><code>## JRIP rules:
+## ===========
+## 
+## (odor = foul) =&gt; type=poisonous (2160.0/0.0)
+## (gill_size = narrow) and (gill_color = buff) =&gt; type=poisonous (1152.0/0.0)
+## (gill_size = narrow) and (odor = pungent) =&gt; type=poisonous (256.0/0.0)
+## (odor = creosote) =&gt; type=poisonous (192.0/0.0)
+## (spore_print_color = green) =&gt; type=poisonous (72.0/0.0)
+## (stalk_surface_below_ring = scaly) and (stalk_surface_above_ring = silky) =&gt; type=poisonous (68.0/0.0)
+## (stalk_color_above_ring = yellow) =&gt; type=poisonous (8.0/0.0)
+## (habitat = leaves) and (cap_color = white) =&gt; type=poisonous (8.0/0.0)
+##  =&gt; type=edible (4208.0/0.0)
+## 
+## Number of Rules : 9</code></pre>
+<p>An easy way to read these rules is to think of them as a list of if-else statements, similar to programming logic.</p>
 </div>
 </div>
 
