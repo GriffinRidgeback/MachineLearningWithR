@@ -1,0 +1,349 @@
+---
+title: "Forecasting Numeric Data - Regression Methods"
+author: "Kevin D'Elia"
+date: "June 10th, 2017"
+output: 
+  html_document: 
+    highlight: kate
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+  html_notebook: 
+    highlight: pygments
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+---
+# Overview
+Mathematical relationships help us to understand many aspects of everyday life.  For example, body weight is a function of one's calorie intake.  When such relationships are expressed with exact numbers, additional clarity is gained.  For example, an additional 250 kilo calories consumed daily may result in nearly a kilogram of weight gain per month.  This paper will cover:
+
+* the basic statistical principles used in regression, a technique that models the size and the strength of numeric relationships
+* how to prepare data for regression analysis, and estimate and interpret a regression model
+* a pair of hybrid techniques known as regression trees and model trees, which adapt decision tree classifiers for numeric prediction tasks
+
+# Understanding regression
+Regression is concerned with specifying the relationship between a single numeric **dependent variable** (the value to be predicted) and one or more numeric **independent variables** (the predictors).  As the name implies, the dependent variable depends upon the value of the independent variable or variables.  The simplest forms of regression assume that the relationship between the independent and dependent variables follows a straight line.
+
+Recall from basic algebra that lines can be defined in a **slope-interecept form ** similar to _y = a + bx_.  In this form, the letter _y_ indicates the dependent variable and _x_ indicates the independent variable.  The **slope** term _b_ specifies how much the line rises for each increase in _x_.  Positive values define lines that slope upward while negative values define lines that slope downward.  The term _a_ is known as the **intercept** because it specifies the point where the line crosses, or intercepts, the vertical _y_ axis.  It indicates the value of _y_ when _x = 0_.
+
+Regression equations model data using a similar slop-intercept format.  The machine's job is to identify values of _a_ and _b_ so that the specified line is best able to relate the supplied _x_ values to the values of _y_.  There may not always be a single function that perfectly relates the values, so the machine must also have some way to quantify the margin of error.
+
+Regression analysis is commonly used for modeling complex relationships among data elements, estimating the impact of a treatment on an outcome, and extrapolating into the future.
+
+Regression methods are also used for **statistical hypothesis testing**, which determines whether a premise is likely to be true or false in light of the observed data.  The regression model's estimates of the strength and consistency of a relationship provide information that can be used to assess whether the observations are due to chance alone.
+
+Regression analysis is not synonymous with a single algorithm.  Rather, it is an umbrella for a large number of methods that can be adapted to nearly any machine learning task.
+
+This section focuses on only the most basic **linear regression** models - those that use straight lines.  When there is only a single independent variable it is known as **simple linear regression**.  In the case of two or more independent variables, this is known as **multiple linear regression**, or simply _multiple regression_.  Both of these techniques assume that the dependent variable is measure on a continuous scale.
+
+Regression can also be used for other types of dependent variables and even for some classification tasks.  For instance, **logistic regression** is used to model a binary categorical outcome, while **Poisson regression** models integer count data.  The method known as **multinomial logistic regression** models a categorical outcome; thus, it can be used for classification.
+Many of the specialized regression methods fall into a class of **Generalized Linear Models (GLM)**.  Using a GLM, linear models can be generalized to other patterns via the use of **link function**, which specifies more complex forms for the relationship between _x_ and _y_.  This allow regression to be applied to almost any type of data.
+
+# Simple linear regression
+
+A simple linear regression model defines the relationship between a dependent variable and a single independent predictor variable using a line defined by an equation in the following form:
+
+_y = $\alpha +\beta x$_
+
+The intercept alpha describes where the line crossed the _y_ axis, while the slope beta describes the change in _y_ given an increase of _x_.  Greek characters are often used in the field of statistics to indicate variables that are parameters of a statistical function.  Therefore, performing a regression analysis involves finding **paramter estimates** for _$\alpha$_ and _$\beta$_.  The parameter estimates for alpha and beta are often denoted using _a_ and _b_ although you may find that some of this terminology and notation is used interchangeably.
+
+# Ordinary Least Squares Estimation
+In order to determine the optimal estimates of _$\alpha$_ and _$\beta$_, an estimation method known as **Ordinary Least Squares (OLS)** was used.  In OLS regression, the slope and intercept are chosen so that they minimize the sum of the squared errors, that is, the vertical distance between the predicted _y_ value and the actual _y_ value.  These errors are known as **residuals**.  In mathematical terms, the goal of OLS regression can be expressed as the task of minimizing the following equation:
+
+$\sum$_(y~i~ - $\hat{y}$~i~)^2^_ = $\sum$_e~i~^2^_
+
+In plain language, this equation defines _e_ (the error)_ as the difference between the actual _y_ value and the predicted _y_ value.  The error values are squared and summed across all the points in the data.  The **y-hat** term is an estimate for the true _y_ value.
+
+The solution for _a_ depends on the value of _b_.  It can be obtained using the following formula:
+
+_a = $\bar{y}$ - b$\bar{x}$_
+
+The horizontal bar appearing over the _x_ and _y_ terms indicates the mean value of _x_ or _y_.
+The proof will not be given here but the value of _b_ that results in the minimum squared error is:
+
+_$\frac{\sum(x_{i} - \bar{x})(y_{i} - \bar{y})}{\sum(x_{i} - \bar{x})^{2}}$_
+
+This equation can be simplified by breaking it into its component parts.  The denominator is very similar to the **variance** of x.  The formula is:
+
+_Var(x) = $\frac{\sum(x_{i} - \bar{x})^{2}}{n}$_
+
+The numerator involves taking the sum of each data point's deviation from the mean _x_ value multiplied by that point's deviation away from the mean _y_ value.  This is similar to the **covariance** for _x_ and _y_; the formula is:
+
+_Cov(x, y) = $\frac{\sum(x_{i} - \bar{x})(y_{i} - \bar{y})}{n}$_
+
+Dividing covariance by variance cancels out the _n_ terms, leaving:
+
+_b = $\frac{Cov(x, y)}{Var(x)}$_
+
+The regression line can be estimated on the following dataset using built-in R function:
+```{r slope}
+launch <- read.csv("./challenger.csv")
+b <- cov(launch$temperature, launch$distress_ct) / var(launch$temperature)
+b
+```
+An estimation for _a_ can be achieved using the ```mean()``` function:
+```{r intercept}
+a <- mean(launch$distress_ct) - b * mean(launch$temperature)
+a
+```
+
+# Correlations
+The **correlation** between two variables is a number that indicates how closely their relationship follows a straight line; typically, this is **Pearson's correlation coefficient**.  The correlation ranges between -1 and +1, with extreme values indicating a perfectly linear relationship, while a correlation close to zero indicates the absence of a linear relationship.
+
+The following formula defines Pearson's correlation:
+
+**$\rho_{x,y}$ = _Corr(x, y)_ = $\frac{Cov(x, y)}{\sigma_{x}\sigma_{y}}$**
+
+This formula can be used to calculate the correlation between the launch temperature and the number of distress events, or use the R correlation function:
+```{r correlation}
+r <- cov(launch$temperature, launch$distress_ct) /
+       (sd(launch$temperature) * sd(launch$distress_ct))
+r
+cor(launch$temperature, launch$distress_ct)
+```
+
+The negative correlation implies that increases in temperature are related to decreases in the number of distressed O-rings.  The correlation also tells about the relative strength of the relationship between temperature and O-ring distress.  Because -0.51 is halfway to the maximum negative correlation of -1, this implies that there is a moderately strong negative linear association.
+
+There are various rules of thumb used to interpret correlation strength.  One method assigns as status of "weak" to values between 0.1 and 0.3, "moderate" to the range of 0.3 to 0.5, and "strong" to values above 0.5 (these also apply to similar ranges of negative correlations).  However, more often the correlation must be interpreted in context.  "Correlation does not imply causation" means that a correlation only describes the association between a pair of variables, yet there could be other unmeasured explanations.  Measuring the correlation between two variables gives a way to quickly gauge the relationships among the independent and dependent variables.
+
+# Multiple linear regression
+Most real-world analyses have more than one independent variable, so **multiple linear regression** is typically used for most numeric prediction tasks.  It is an extension of simple linear regression, namely, to find values of beta coefficients that minimize the prediction error of a linear equation.  The key difference is that there are additional terms for additional independent variables.
+
+Multiple regression equations generally follow the form of the following equation.  The dependent variable _y_ is specified as the sum of an intercept term _$\alpha$_ plus the product of the estimated _$\beta$_ value and the _x_ values for each of the _i_ features.  An error term _$\epsilon$_ has been added here as a reminder that the predictions are not perfect, and it represent the **residual** term noted previously:
+
+_y = $\alpha$ + $\beta_{1}x_{1}$ + $\beta_{2}x_{2}$ + ... + $\beta_{i}x_{i}$ + $\epsilon$_
+
+Consider for a moment the interpretation of the estimated regression parameters.  Note that in the preceding equation, a coefficient is provided for each feature.  This allows each feature to have a separate estimated effect on the value of _y_.  In other words, _y_ changes by the amount _$\beta_{i}$_ for each unit increase in _x~i~_.  The intercept _$\alpha$_ is then the expected value of _y_ when the independent variables are all zero.
+
+Since the intercept term _$\alpha$_ is really no different than any other regression parameter, it is also sometimes denoted as _$\beta_{0}$_ as shown next:
+
+_y = $\beta_{0}$ + $\beta_{1}x_{1}$ + $\beta_{2}x_{2}$ + ... + $\beta_{i}x_{i}$ + $\epsilon$_
+
+Just like before, the intercept is unrelated to any of the independent _x_ variables.  However, for reasons that will become clear shortly, it helps to imagine _$\beta_{0}$_ as if it were being multiplied by a term _x~0^'^~_ which is a constant with the value 1:
+
+_y = $\beta_{0}x_{0}$ + $\beta_{1}x_{1}$ + $\beta_{2}x_{2}$ + ... + $\beta_{i}x_{i}$ + $\epsilon$_
+
+In order to estimate the values of the regression parameters, each observed value of the dependent variable _y_ must be related to the observed values of the independent _x_ variables using the regression equation in the previous form.  See pg.183 for a graphic of this relationship.  The many rows and columns of data illustrated can be described in a condensed formulation using bold font **matrix notation** to indicate that each of the terms represents multiple values:
+
+**Y = $\beta$X + $\epsilon$**
+
+The dependent variable is now a vector, **Y**, with a row for every example.  The independent variables have been combined into a matrix, **X**, with a column for each feature plus an additional column of '1' values for the intercept term.  Each column has a row for every example.  The regression coefficients **$\beta$** and residual errors **$\epsilon$** are also now vectors.
+
+The goal is now to solve for **$\beta$**, the vector of regression coefficients that minimizes the sum of the squared errors between the predicted and actual **Y** values.  Finding the optimal solution requires the use of matrix algebra, but the best estimate of the vector **$\beta$** can be computed as:
+
+**$\hat{\beta}$ = (X^T^X)^-1^X^T^Y**
+
+This solution uses a pair of matrix operations - the **T** indicates the **transpose** of matrix **X**, while the negative exponent indicates the **matrix inverse**.  The following code create a basic regression function named ```reg()```, which takes a parameters _y_ and _x_ and returns a vector of estimated beta coefficients:
+
+```{r beta_coefficients}
+# creating a simple multiple regression function
+reg <- function(y, x) {
+  x <- as.matrix(x)
+  x <- cbind(Intercept = 1, x)
+  b <- solve(t(x) %*% x) %*% t(x) %*% y
+  colnames(b) <- "estimate"
+  print(b)
+}
+```
+
+Since the function uses sets of columns from a data frame, the ```as.matrix()``` function is used to convert the data frame into matrix form.  The ```cbind()``` function is used to bind an additional column onto the _x_ matrix.  Then, a number of matrix operations are performed on the _x_ and _y_ objects:
+
+* ```solve()``` takes the inverse of a matrix
+* ```t()``` is used to transpose a matrix
+* ```%*%``` multiplies two matrices
+
+By combining these as shown, the function will return a vector _b_, which contains the estimated parameters for the linear model relating _x_ to _y_.  Applying the function to the shuttle launch data and then comparing it to the results achieved earlier with the simple linear model shows an exact match:
+```{r compare_models}
+# test regression model with simple linear regression
+reg(y = launch$distress_ct, x = launch[2])
+```
+
+Now the function can be used to build a multiple regression model by specifying three columns of data instead of just one:
+```{r multiple_regression}
+# use regression model with multiple regression
+reg(y = launch$distress_ct, x = launch[2:4])
+```
+
+# Example - predicting medical expenses using linear regression
+In order for a health insurance company to make money, it needs to collect more in yearly premiums than it spends on medical care to its beneficiaries.  As a result, insurers invest a great deal of time and money in developing models that accurately forecast medical expenses for the insured population.
+
+Medical expenses are difficult to estimate because the most costly conditions are rare and seemingly random.  Still, some conditions are more prevalent for certain segments of the population.  For instance, lung cancer is more likely among smokers than non-smokers, and heart disease may be more likely among the obese.
+The goal of this analysis is to use patient data to estimate the average medical care expenses for such population segments.  These estimates can be used to create actuarial tables that set the price of yearly premiums higher or lower, depending on the expected treatment costs.
+
+## Step 1 - collecting data
+
+For this analysis, a simulated dataset containing hypothetical medical expenses for patients in the United States will be used; it is contained in the following file:
+```{r read_medical_data}
+insurance <- read.csv("insurance.csv", stringsAsFactors = TRUE)
+```
+
+The file includes 1,338 examples of beneficiaries currently enrolled in the insurance plan, with the following features:
+
+* _age_: integer
+* _sex_: factor
+* _bmi_: body mass index
+* _children_: integer
+* _smoker_: factor
+* _region_: factor
+
+It is important to give some thought to how these variables may be related to billed medical expenses.  For instance, it is reasonable to expect that older people and smokers are at a higher risk of large medical expenses.  Unlike many other machine learning methods, in regression analysis, the relationships amount the features are typically specified by the user rather than being detected automatically.
+
+## Step 2 - exploring and preparing the data
+
+Now that the data has been read in, what is its structure?
+```{r features}
+str(insurance)
+```
+
+The model's dependent variable is _expenses_, which measures the medical costs each person charged to the insurance plan for the year.  Prior to building a regression model, it is often helpful to check for normality.  Although linear regression does not strictly require a normally distributed dependent variable, the model often fits better when this is true.  A quick look at the summary statistics reveals that the mean value is greater than the median, implying that the distribution of insurance expenses is right-skewed.  
+
+```{r expense_summary}
+summary(insurance$expenses)
+```
+
+A histogram will confirm this assumption:
+```{r expense_histogram}
+library(RColorBrewer)
+hist(insurance$expenses, 
+     xlab = "Expenses (in USD)", 
+     ylab = "",
+     col=brewer.pal(9, "Greens"),
+     main = "Insurance Costs")
+```
+
+As expected, the figure shows a right-skewed distribution.  It also shows that the majority of people in the data have yearly medical expenses between zero and $15,000, in spite of the fact that the tail of the distribution extends far past these peaks.  Although this distribution is not ideal for a linear regression, knowing this weakness ahead of time may help to design a better-fitting model later on.
+
+Before addressing that issue, another problem is at hand.  Regression models require that every feature is numeric, yet there are three factor-type features in the data frame.  One of those, _region_, has four levels, and this table shows the distribution of those levels as being fairly evenly divided:
+```{r table_region}
+table(insurance$region)
+```
+
+### Exploring relationships among features - the correlation matrix
+Before fitting a regression model to data, it can be useful to determine how the independent variables are related to the dependent variable and each other.  A **correlation matrix** provides a quick overview of these relationships.  Given a set of variables, it provides a correlation for each pairwise relationship.  One for the four numeric variables in the insurance data appears next:
+```{r cor_matrix}
+# exploring relationships among features: correlation matrix
+cor(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+At the intersection of each row and column pair, the correlation is listed for the variables indicated by that row and column.  The diagonal is always 1.0 since there is always a perfect correlation between a variable and itself.  The values above and below the diagonal are identical since correlations are symmetrical.  In other words, _cor(x, y)_ is equal to _cor(y, x)_.
+
+None of the correlations in the matrix are considered strong, but there are some notable associations.  For instance, _age_ and _bmi_ appear to have a weak positive correlation, meaning that as someone ages, their body mass tends to increase.  There is also a moderate positive correlation between _age_ and _expenses_, _bmi_ and _expenses_, and _children_ and _expenses_.  These associations imply that as age, body mass, and number of children increase, the expected cost of insurance goes up.
+
+### Visulaizing relationships among features - the scatterplot matrix
+It can also be helpful to visualize the relationships among numeric features by using a scatterplot.  Although a scatterplot for each possible relationship could be created, doing so for a large number of features might become tedious.
+
+An alternative is to create a **scatterplot matrix**, or **SPLOM**, which is simply a collection of scatterplots arranged in a grid.  It is used to detect patterns among three or more variables.  The scatterplot matrix is not a true multidimensional visualization because only two features are examined at a time.  Still, it provides a general sense of how the data may be interrelated.  The ```pairs()``` function provides basic functionality for producing scatterplot matrices:
+```{r pairs}
+# visualing relationships among features: scatterplot matrix
+pairs(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+In the scatterplot matrix, the intersection of each row and column holds the scatterplot of the variables indicated by the row and column pair.  The diagrams above and below the diagonal are transpositions since the _x_ axis and _y_ axis have been swapped.
+
+Although some of the plots look like random clouds of points, a few seem to display some trends.  The relationships between _age_ and _expenses_ displays several relatively straight lines, while the _bmi_ versus _expenses_ plot has two distinct groups of points.  It is difficult to detect trends in any of the other plots.
+
+If we add more information to the plot, it can be even more useful; the ```pairs.panel()``` function in the _psych_ package does just that:
+```{r psych}
+library(psych)
+pairs.panels(insurance[c("age", "bmi", "children", "expenses")])
+```
+
+Above the diagonal, the scatterplots have been replaced with a correlation matrix.  On the diagonal, a histogram depicting the distribution of values for each feature is shown.  Finally, the scatterplots below the diagonal are now presented with additional information.
+
+The oval-shaped object on each scatterplot is a **correlation ellipse**.  It provides a visualization of correlation strength.  The dot at the center of the ellipse indicates the point at the mean values for the _x_ and _y_ axis variables.  The correlation between the two variables is indicated by the shape of the ellipse; the more it is stretched, the stronger the correlation.  An almost perfectly round oval, as with _bmi_ and _children_, indicates a very weak correlation (in this case, it is 0.01).
+
+The curve drawn on the scatterplot is called a **loess curve**. It indicates the general relationship between the _x_ and _y_ axis variables.  It is best understood by an example.  The curve for _age_ and _children_ is an upside-down U, peaking around middle age.  This means that the oldest and youngest people in the sample have fewer children on the insurance plan than those around middle age.  Because this trend is non-linear, this finding could not have been inferred from the correlations alone.  On the other hand, the loess curve for _age_ and _bmi_ is a line sloping gradually up, implying that body mass increases with age, but this was already inferred from the correlation matrix.
+
+## Step 3 - training a model on the data
+To fit a linear regression model to data with R, the ```lm()``` function can be used.  The ```lm()``` syntax is as follows:
+
+**Building the model:**
+
+```m <- lm(dv ~ iv, data = mydata)```
+
+where
+
+* _dv_ is the dependent variable in the **mydata** data frame to be modeled
+* _iv_ is an R formula specifying the independent variables in the **mydata** data frame to use in the model
+* _data_ specifies the data frame in which the **dv** and **iv** variables can be found
+
+The function will return a regression model object that can be used to make predictions.  Interactions between independent variables can be specified using the * operator.
+
+**Making predictions:**
+
+```p <- predict(m, test)```
+
+where
+
+* _m_ is a model trained by the **lm()** function
+* _test_ is a data frame containing test data with the same features as the training data used to build the model
+
+The function will return a vector of predicted values.
+
+**Example:**
+
+```ins_model <- lm(charges ~ age + sex + smoker, data = insurance)```
+
+```ins_predict <- predict(ins_model, insurance_test)```
+
+The following command fits a linear regression model relating the six independent variables to the total medical expenses.  The R formula syntax uses the tilde character to describe the model; the dependent variable ```expenses``` goes to the left of the tilde while the independent variables go to the right, separated by + signs.  There is no need to specify the regression model's intercept term as it is assumed by default:
+
+```ins_model <- lm(expenses ~ age + children + bmi + sex + smoker + region, data = insurance)```
+
+Because the . character can be used to specify all the features (excluding those a;ready specified in the formula), the following command is equivalent to the preceding command (with resulting model data shown):
+
+```{r model}
+ins_model <- lm(expenses ~ ., data = insurance)
+ins_model
+```
+
+Understanding the regression coefficients is fairly straightforward.  The intercept is the predicted value of ```expenses``` when the independent variables are equal to zero.  As is the case here, quite often the intercept is of little value alone because it is impossible to have values of zero for all features.  Fore example, since no person exists with age zero and BMI zero, the intercept has no real-world interpretation.  For this reason, in practice, the intercept is often ignored.
+
+The beta coefficients (the ones used for multiplying the independent variables) indicate the estimated increase in expenses for an increase of one in each of the features, assuming all other values are held constant.  For instance, for each additional year of age, medical expenses would increase by $256.80 on average, assuming all other factors being equal.  Similarly, each additional child results in an average of $475.70 in additional medical expenses each year, and each unit increase in BMI is associated with an average increase of $339.30 in yearly medical expenses, all else equal.
+
+Although only six features were specified in the model formula, eight coefficients are reported in addition to the intercept.  This happened because the ```lm()``` function automatically applied a technique known as **dummy coding** to each of the factor-type variables included in the model.
+
+Dummy coding allows a nominal feature to be treated as numeric by creating a binary variable, often called a **dummy variable**, for each category of the feature.  The dummy variable is set to _1_ if the observation falls into the specified category or _0_ otherwise.  For instance, the _sex_ feature has two categories: _male_ and _female_. This will be split into two binary variables, which R names _sexmale_ and _sexfemale_.  For observations where _sex = male_, then _sexmale = 1_ and _sexfemale = 0_, and vice versa.  The same coding applies to variables with three or more categories, such as _region_, which was split into _regionnorthwest_, etc.
+
+When adding a dummy variable to a regression model, one category is always left out to serve as the reference category.  The estimates are then interpreted relative to the reference.  In this model, R automatically held out the _sexfemale_, _smokerno_, and _regionnortheast_ variables, making female non-smokers in the northeast region the reference group.  Thus, makes have 4151,40 less medical expenses each year relative to females and smokers cost an average of $23,847.50 more than non-smokers per year.  The coefficient for each of the three regions in the model is negative, which implies that the reference group, the northeast region, tends to have the highest average expenses.
+
+By default, R uses the first level of the factor variable as the reference.  To use another level, the ```relevel()``` function can be used to specify the reference group manually.
+
+The results of the linear regression model make logical sense:  odl age, smoking, and obesity tend to be linked to additional health issues, while additional family member dependents may result in an increase in physician visits and preventive care such as vaccinations and yearly physical exams.  There is no indication at this point, however, of how well the model is fitting the data.  The next section will address this point.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
