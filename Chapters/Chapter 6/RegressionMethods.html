@@ -164,6 +164,12 @@ $(document).ready(function () {
 <li><a href="#visulaizing-relationships-among-features---the-scatterplot-matrix"><span class="toc-section-number">7.2.2</span> Visulaizing relationships among features - the scatterplot matrix</a></li>
 </ul></li>
 <li><a href="#step-3---training-a-model-on-the-data"><span class="toc-section-number">7.3</span> Step 3 - training a model on the data</a></li>
+<li><a href="#step-4---evaluating-model-performance"><span class="toc-section-number">7.4</span> Step 4 - evaluating model performance</a></li>
+<li><a href="#step-5---improving-model-performance"><span class="toc-section-number">7.5</span> Step 5 - improving model performance</a><ul>
+<li><a href="#model-specification---adding-non-linear-relationships"><span class="toc-section-number">7.5.1</span> Model specification - adding non-linear relationships</a></li>
+<li><a href="#transformation---converting-a-numeric-variable-to-a-binary-indicator"><span class="toc-section-number">7.5.2</span> Transformation - converting a numeric variable to a binary indicator</a></li>
+<li><a href="#model-specification---adding-interaction-effects"><span class="toc-section-number">7.5.3</span> Model specification - adding interaction effects</a></li>
+</ul></li>
 </ul></li>
 </ul>
 </div>
@@ -404,7 +410,73 @@ ins_model</code></pre></div>
 <p>Dummy coding allows a nominal feature to be treated as numeric by creating a binary variable, often called a <strong>dummy variable</strong>, for each category of the feature. The dummy variable is set to <em>1</em> if the observation falls into the specified category or <em>0</em> otherwise. For instance, the <em>sex</em> feature has two categories: <em>male</em> and <em>female</em>. This will be split into two binary variables, which R names <em>sexmale</em> and <em>sexfemale</em>. For observations where <em>sex = male</em>, then <em>sexmale = 1</em> and <em>sexfemale = 0</em>, and vice versa. The same coding applies to variables with three or more categories, such as <em>region</em>, which was split into <em>regionnorthwest</em>, etc.</p>
 <p>When adding a dummy variable to a regression model, one category is always left out to serve as the reference category. The estimates are then interpreted relative to the reference. In this model, R automatically held out the <em>sexfemale</em>, <em>smokerno</em>, and <em>regionnortheast</em> variables, making female non-smokers in the northeast region the reference group. Thus, makes have 4151,40 less medical expenses each year relative to females and smokers cost an average of $23,847.50 more than non-smokers per year. The coefficient for each of the three regions in the model is negative, which implies that the reference group, the northeast region, tends to have the highest average expenses.</p>
 <p>By default, R uses the first level of the factor variable as the reference. To use another level, the <code>relevel()</code> function can be used to specify the reference group manually.</p>
-<p>The results of the linear regression model make logical sense: odl age, smoking, and obesity tend to be linked to additional health issues, while additional family member dependents may result in an increase in physician visits and preventive care such as vaccinations and yearly physical exams. There is no indication at this point, however, of how well the model is fitting the data. The next section will address this point.</p>
+<p>The results of the linear regression model make logical sense: old age, smoking, and obesity tend to be linked to additional health issues, while additional family member dependents may result in an increase in physician visits and preventive care such as vaccinations and yearly physical exams. There is no indication at this point, however, of how well the model is fitting the data. The next section will address this point.</p>
+</div>
+<div id="step-4---evaluating-model-performance" class="section level2">
+<h2><span class="header-section-number">7.4</span> Step 4 - evaluating model performance</h2>
+<p>The parameter estimates we obtained by typing <code>ins_model</code> tell about how the independent variables are related to the dependent variable, but they tell us nothing about how well the model fits our data. The <code>summary()</code> command will do that:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">summary</span>(ins_model)</code></pre></div>
+<pre><code>## 
+## Call:
+## lm(formula = expenses ~ ., data = insurance)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -11302.7  -2850.9   -979.6   1383.9  29981.7 
+## 
+## Coefficients:
+##                 Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -11941.6      987.8 -12.089  &lt; 2e-16 ***
+## age                256.8       11.9  21.586  &lt; 2e-16 ***
+## sexmale           -131.3      332.9  -0.395 0.693255    
+## bmi                339.3       28.6  11.864  &lt; 2e-16 ***
+## children           475.7      137.8   3.452 0.000574 ***
+## smokeryes        23847.5      413.1  57.723  &lt; 2e-16 ***
+## regionnorthwest   -352.8      476.3  -0.741 0.458976    
+## regionsoutheast  -1035.6      478.7  -2.163 0.030685 *  
+## regionsouthwest   -959.3      477.9  -2.007 0.044921 *  
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 6062 on 1329 degrees of freedom
+## Multiple R-squared:  0.7509, Adjusted R-squared:  0.7494 
+## F-statistic: 500.9 on 8 and 1329 DF,  p-value: &lt; 2.2e-16</code></pre>
+<p>The output provides three key ways to evaluate the performance, or fit, of the model:</p>
+<ol style="list-style-type: decimal">
+<li><p>The <strong>residuals</strong> section provides summary statistics for the <em>errors</em> in the predictions, some of which are apparently quite substantial. Since a residual is equal to the true value minus the predicted value, the maximum error of 29981.7 suggests that the model under-predicted expenses by nearly $30,000 for at least one observation, i.e., true value = $100,000 and predicted value = $70,000. On the other hand, 50% of errors fall within the 1Q and 3Q values, so the majority of predictions were between $2,850,90 over the true value and $1383.90 under the true value. So, negative values imply over-prediction and positive values imply under-prediction.</p></li>
+<li><p>For each estimated regression coefficient, the <strong>p-value</strong>, denoted <code>Pr(&gt;|t|)</code>, provides an estimate of the probability that the true coefficient is zero given the value of the estimate. Small p-values suggest that the true coefficient is very unlikely to be zero, which means that the feature is extremely unlikely to have no relationship with the dependent variable. Note that some of the p-values have stars, which correspond to the footnotes to indicate the <strong>significance level</strong> met by the estimate. This level is a threshold, chosen prior to building the model, which will be used to indicate “real” findings, as opposed to those due to chance alone; p-values less than the significance level are considered <strong>statistically significant</strong>. If the model had few such terms, it may be cause for concern, since this would indicate that the features used are not very predictive of the outcome. Here, the model has several highly significant variables, and they seem to be related to the outcome in logical ways.</p></li>
+<li><p>The <strong>multiple R-squared value</strong> (also called the <em>coefficient of determination</em>) provides a measure of how well the model as a whole explains the values of the dependent variable. It is similar to the correlation coefficient, in that the closer the value is to 1.0, the better the model perfectly explains the data. Since the R-squared values is 0.7494, we know that the model explains nearly 75% of the variation in the dependent variable. Because models with more features always explain more variation, the <strong>adjusted R-squared value</strong> corrects R-squared by penalizing models with a large number of independent variables. It is useful for comparing the performance of models with different numbers of explanatory variables.</p></li>
+</ol>
+<p>Given the preceding three performance indicators, the model is performing fairly well. It is not uncommon for regression models of real-world data to have fairly low R-squared values, a value of 0.75 is actually quite good. The size of some of the error sis a bit concerning, but not surprising given the nature of medical expense data.</p>
+</div>
+<div id="step-5---improving-model-performance" class="section level2">
+<h2><span class="header-section-number">7.5</span> Step 5 - improving model performance</h2>
+<p>As mentioned previously, a key difference between the regression modeling and other machine learning approaches is that regression typically leaves feature selection and model specification to the user. Consequently, if there is subject matter knowledge about how a feature is related to the outcome, this information can be used to inform the model specification and potentially improve the model’s performance.</p>
+<div id="model-specification---adding-non-linear-relationships" class="section level3">
+<h3><span class="header-section-number">7.5.1</span> Model specification - adding non-linear relationships</h3>
+<p>In linear regression, the relationship between an independent variable and the dependent variable is assumed to be linear, yet this may not necessarily be true. For example, the effect of age on medical expenditure may not be constant throughout all the age values; the treatment may become disproportionately expensive for oldest populations.</p>
+<p>Recall that a typical regression equation follows a form similar to this:</p>
+<p><strong><em>y = <span class="math inline">\(\alpha\)</span> + <span class="math inline">\(\beta_{1}\)</span>x</em></strong></p>
+<p>To account for a non-linear relationship, add a higher order term to the regression model, treating the model as a polynomial. In effect, it is modeling a relationship like this:</p>
+<p><strong><em>y = <span class="math inline">\(\alpha\)</span> + <span class="math inline">\(\beta_{1}\)</span>x + <span class="math inline">\(\beta_{2}\)</span>x<sup>2</sup></em></strong></p>
+<p>The difference between these two models is that an additional beta will be estimated, which is intended to capture the effect of the <em>x</em>-squared term. This allows the impact of age to be measured as a function of age squared.</p>
+<p>To add the non-linear age to the model, simply create a new variable:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">insurance$age2 &lt;-<span class="st"> </span>insurance$age^<span class="dv">2</span></code></pre></div>
+<p>The new, improved model will have both <code>age</code> and <code>age2</code> in the <em>lm()</em> formula using the <code>expenses ~ age + age2</code> form. This allows the model to separate the linear and on-linear impact of age on medical expenses.</p>
+</div>
+<div id="transformation---converting-a-numeric-variable-to-a-binary-indicator" class="section level3">
+<h3><span class="header-section-number">7.5.2</span> Transformation - converting a numeric variable to a binary indicator</h3>
+<p>By creating a binary obesity indicator variable that is 1 if the BMI is at least 30, and 0 if less, the relationship between BMI and expenses can be modeled. The estimated beta for this binary feature would then indicate the average net impact on medical expenses for individuals with BMI of 30 or above, relative to those with BMI less than 30.</p>
+<p>The <code>ifelse()</code> function can be used for this purpose, for each element in a vector a test against a specified condition is performed, as shown next:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">insurance$bmi30 &lt;-<span class="st"> </span><span class="kw">ifelse</span>(insurance$bmi &gt;=<span class="st"> </span><span class="dv">30</span>, <span class="dv">1</span>, <span class="dv">0</span>)</code></pre></div>
+<p>As before with <em>age2</em>, the <em>bmi30</em> variable can be included in the new, improved model; it will either replace or complement the existing <em>bmi</em> variable, depending on the needs of the model. In other words, does obesity have any effect in addition to the separate linear BMI effect. To determine whether or not to include the variable in the model, examine the p-value which will indicate the statistical significance of the variable.</p>
+</div>
+<div id="model-specification---adding-interaction-effects" class="section level3">
+<h3><span class="header-section-number">7.5.3</span> Model specification - adding interaction effects</h3>
+<p>So far, only each feature’s individual contribution to the outcome has been considered. What if certain features have a combined impact on the dependent variable? For instance, smoking and obesity may have harmful effects separately, but it is reasonable to assume that their combined effect may be worse than the sum of each one alone.</p>
+<p>When two features have a combined effect, this is known as an <strong>interaction</strong>. If it is thought that two variables interact, this hypothesis can be tested by adding their interaction to the model. Interaction effects are specified uing the R formula syntax. To have the obesity indicator <em>bmi30</em> and the smoking indicator <em>smoker</em> interact, write the formula in the form <code>expenses ~ bmi30*smoker</code>.</p>
+<p>The * operator is shorthand that instructs R to model <code>expenses ~ bmi30 + smokeryes + bmi30:smokeryes</code>. The colon operator in the expanded form indicates that the <code>bmi30:smokeryes</code> is the interaction between the two variables. Note that the expanded form also automatically included the <em>bmi30</em> and <em>smoker</em> variables as well as the interaction. Interactions should never be included in a model without also adding each of the interacting variables.</p>
+</div>
 </div>
 </div>
 

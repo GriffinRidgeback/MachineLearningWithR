@@ -309,27 +309,65 @@ When adding a dummy variable to a regression model, one category is always left 
 
 By default, R uses the first level of the factor variable as the reference.  To use another level, the ```relevel()``` function can be used to specify the reference group manually.
 
-The results of the linear regression model make logical sense:  odl age, smoking, and obesity tend to be linked to additional health issues, while additional family member dependents may result in an increase in physician visits and preventive care such as vaccinations and yearly physical exams.  There is no indication at this point, however, of how well the model is fitting the data.  The next section will address this point.
+The results of the linear regression model make logical sense:  old age, smoking, and obesity tend to be linked to additional health issues, while additional family member dependents may result in an increase in physician visits and preventive care such as vaccinations and yearly physical exams.  There is no indication at this point, however, of how well the model is fitting the data.  The next section will address this point.
 
+## Step 4 - evaluating model performance
+The parameter estimates we obtained by typing ```ins_model``` tell about how the independent variables are related to the dependent variable, but they tell us nothing about how well the model fits our data.  The ```summary()``` command will do that:
+```{r model_summary}
+summary(ins_model)
+```
 
+The output provides three key ways to evaluate the performance, or fit, of the model:
 
+1. The **residuals** section provides summary statistics for the _errors_ in the predictions, some of which are apparently quite substantial.  Since a residual is equal to the true value minus the predicted value, the maximum error of 29981.7 suggests that the model under-predicted expenses by nearly $30,000 for at least one observation, i.e., true value = $100,000 and predicted value = $70,000.  On the other hand, 50% of errors fall within the 1Q and 3Q values, so the majority of predictions were between $2,850,90 over the true value and $1383.90 under the true value.  So, negative values imply over-prediction and positive values imply under-prediction.
 
+2. For each estimated regression coefficient, the **p-value**, denoted ```Pr(>|t|)```, provides an estimate of the probability that the true coefficient is zero given the value of the estimate.  Small p-values suggest that the true coefficient is very unlikely to be zero, which means that the feature is extremely unlikely to have no relationship with the dependent variable.  Note that some of the p-values have stars, which correspond to the footnotes to indicate the **significance level** met by the estimate.  This level is a threshold, chosen prior to building the model, which will be used to indicate "real" findings, as opposed to those due to chance alone; p-values less than the significance level are considered **statistically significant**.  If the model had few such terms, it may be cause for concern, since this would indicate that the features used are not very predictive of the outcome.  Here, the model has several highly significant variables, and they seem to be related to the outcome in logical ways.
 
+3. The **multiple R-squared value** (also called the _coefficient of determination_) provides a measure of how well the model as a whole explains the values of the dependent variable.  It is similar to the correlation coefficient, in that the closer the value is to 1.0, the better the model perfectly explains the data.  Since the R-squared values is 0.7494, we know that the model explains nearly 75% of the variation in the dependent variable.  Because models with more features always explain more variation, the **adjusted R-squared value** corrects R-squared by penalizing models with a large number of independent variables.  It is useful for comparing the performance of models with different numbers of explanatory variables.
 
+Given the preceding three performance indicators, the model is performing fairly well.  It is not uncommon for regression models of real-world data to have fairly low R-squared values, a value of 0.75 is actually quite good.  The size of some of the error sis a bit concerning, but not surprising given the nature of medical expense data.
 
+## Step 5 - improving model performance
+As mentioned previously, a key difference between the regression modeling and other machine learning approaches is that regression typically leaves feature selection  and model specification to the user.  Consequently, if there is subject matter knowledge about how a feature is related to the outcome, this information can be used to inform the model specification and potentially improve the model's performance.
 
+### Model specification - adding non-linear relationships
+In linear regression, the relationship between an independent variable and the dependent variable is assumed to be linear, yet this may not necessarily be true.  For example, the effect of age on medical expenditure may not be constant throughout all the age values; the treatment may become disproportionately expensive for oldest populations.
 
+Recall that a typical regression equation follows a form similar to this:
 
+**_y = $\alpha$ + $\beta_{1}$x_**
 
+To account for a non-linear relationship, add a higher order term to the regression model, treating the model as a polynomial.  In effect, it is modeling a relationship like this:
 
+**_y = $\alpha$ + $\beta_{1}$x + $\beta_{2}$x^2^_**
 
+The difference between these two models is that an additional beta will be estimated, which is intended to capture the effect of the _x_-squared term.  This allows the impact of age to be measured as a function of age squared.
 
+To add the non-linear age to the model, simply create a new variable:
 
+```{r age2}
+insurance$age2 <- insurance$age^2
+```
 
+The new, improved model will have both ```age``` and ```age2``` in the _lm()_ formula using the ```expenses ~ age + age2``` form.  This allows the model to separate the linear and on-linear impact of age on medical expenses.
 
+### Transformation - converting a numeric variable to a binary indicator
+By creating a binary obesity indicator variable that is 1 if the BMI is at least 30, and 0 if less, the relationship between BMI and expenses can be modeled.  The estimated beta for this binary feature would then indicate the average net impact on medical expenses for individuals with BMI of 30 or above, relative to those with BMI less than 30.
 
+The ```ifelse()``` function can be used for this purpose, for each element in a vector a test against a specified condition is performed, as shown next:
 
+```{r ifelse}
+insurance$bmi30 <- ifelse(insurance$bmi >= 30, 1, 0)
+```
 
+As before with _age2_, the _bmi30_ variable can be included in the new, improved model; it will either replace or complement the existing _bmi_ variable, depending on the needs of the model.  In other words, does obesity have any effect in addition to the separate linear BMI effect.  To determine whether or not to include the variable in the model, examine the p-value which will indicate the statistical significance of the variable.
+
+### Model specification - adding interaction effects
+So far, only each feature's individual contribution to the outcome has been considered.  What if certain features have a combined impact on the dependent variable?  For instance, smoking and obesity may have harmful effects separately, but it is reasonable to assume that their combined effect may be worse than the sum of each one alone.
+
+When two features have a combined effect, this is known as an **interaction**.  If it is thought that two variables interact, this hypothesis can be tested by adding their interaction to the model.  Interaction effects are specified uing the R formula syntax.  To have the obesity indicator _bmi30_ and the smoking indicator _smoker_ interact, write the formula in the form ```expenses ~ bmi30*smoker```.
+
+The * operator is shorthand that instructs R to model ```expenses ~ bmi30 + smokeryes + bmi30:smokeryes```.  The colon operator in the expanded form indicates that the ```bmi30:smokeryes``` is the interaction between the two variables.  Note that the expanded form also automatically included the _bmi30_ and _smoker_ variables as well as the interaction.  Interactions should never be included in a model without also adding each of the interacting variables.
 
 
 
