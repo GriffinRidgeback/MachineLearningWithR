@@ -365,9 +365,308 @@ As before with _age2_, the _bmi30_ variable can be included in the new, improved
 ### Model specification - adding interaction effects
 So far, only each feature's individual contribution to the outcome has been considered.  What if certain features have a combined impact on the dependent variable?  For instance, smoking and obesity may have harmful effects separately, but it is reasonable to assume that their combined effect may be worse than the sum of each one alone.
 
-When two features have a combined effect, this is known as an **interaction**.  If it is thought that two variables interact, this hypothesis can be tested by adding their interaction to the model.  Interaction effects are specified uing the R formula syntax.  To have the obesity indicator _bmi30_ and the smoking indicator _smoker_ interact, write the formula in the form ```expenses ~ bmi30*smoker```.
+When two features have a combined effect, this is known as an **interaction**.  If it is thought that two variables interact, this hypothesis can be tested by adding their interaction to the model.  Interaction effects are specified using the R formula syntax.  To have the obesity indicator _bmi30_ and the smoking indicator _smoker_ interact, write the formula in the form ```expenses ~ bmi30*smoker```.
 
 The * operator is shorthand that instructs R to model ```expenses ~ bmi30 + smokeryes + bmi30:smokeryes```.  The colon operator in the expanded form indicates that the ```bmi30:smokeryes``` is the interaction between the two variables.  Note that the expanded form also automatically included the _bmi30_ and _smoker_ variables as well as the interaction.  Interactions should never be included in a model without also adding each of the interacting variables.
+
+### Putting it all together - an improved regression model
+To summarize the improvements:
+
+* added a non-linear term for age
+* created an indicator for obesity
+* specified an interaction between obesity and smoking
+
+The new model will include the newly constructed variables and the interaction term:
+```{r new_model}
+# create final model
+ins_model2 <- lm(expenses ~ age + age2 + children + bmi + sex +
+                   bmi30*smoker + region, data = insurance)
+
+summary(ins_model2)
+```
+
+The model fit statistics help to determine whether the changes improved the performance of the regression model.  Relative to the first model, the R-squared value has improved from 0.75 to about 0.87.  Similarly, the adjusted R-squared value, which takes into account the fact that the model grew in complexity, also improved with the same numbers.  The model is now explaining 87% of the variation in medical treatment costs.  Additionally, the theories about the model's functional form seem to be validated.  The higher-order ```age2``` term is statistically significant, as is the obesity indicator ```bmi30```.  The interaction between obesity and smoking suggests a massive effect; in addition to the increased costs of over $13,404 for smoking alone, obese smokers spend another $19,810 per year.  This may suggest that smoking exacerbates diseases associated with obesity.
+
+# Understanding regression trees and model trees
+Recall that a decision tree builds a model much like a flowchart in which decision nodes, leaf nodes, and branches define a series of decisions that are used to classify examples.  Such trees can also be used for numeric prediction by making only small adjustments to the tree-growing algorithm.  This section will consider only the ways in which trees for numeric prediction differ from trees used for classification.
+
+Trees for numeric prediction fall into two categories.  The first known as **regression trees**, were introduced in the 1980s as part of the seminal **Classification and Regression Tree (CART)** algorithm.  Despite the name, regression trees do not use linear regression methods as described earlier in this chapter; rather, they make predictions based on the average value of examples that reach a leaf.
+
+The second type of trees for numeric prediction are known as **model trees**.  Introduced several years later than regression trees, they are lesser-known, but perhaps more powerful.  Model trees are grown in much the same way as regression trees, but at each leaf, a multiple linear regression model is built from the examples reaching that node.  Depending on the number of leaf nodes, a model tree may build tens or even hundreds of such models.  This may make model trees more difficult to understand than the equivalent regression tree, with the benefit that they may result in a more accurate model.
+
+# Adding regression to trees
+Trees that can perform numeric prediction offer a compelling yet often overlooked alternative to regression modeling.  The strengths and weaknesses of regression trees and model trees relative to the more common regression methods are listed on page 202 of the book.
+
+Though traditional regression methods are typically the first choice for numeric prediction tasks, in some cases, numeric decision trees offer distinct advantages.  For instance, decision trees may be better suited for tasks with many features or many complex, non-linear relationships among features and outcome.  These situations present challenges for regression. Regression modeling also makes assumptions about how numeric data is distributed that are often violated in real-world data.  This is not the case for trees.
+
+Trees for numeric prediction are built in much the same way as they are for classification.  Beginning at the root node the data is partitioned using a divide-and-conquer strategy according to the feature that will result in the greatest increase in homogeneity in the outcome after a split is performed.  In classification trees, recall that homogeneity is measured by entropy, which is undefined for numeric data.  Instead, for numeric decision trees, homogeneity is measured by statistics such as variance, standard deviation, or absolute deviation from the mean.
+
+One common splitting criteria is called the **Standard Deviation Reduction (SDR)**.  It is defined by the following formula:
+
+  **SDR = _sd(T)_ -  $\Sigma_{i}$ $\frac{|T_{i}|}{|T|}$ $\times$ _sd(T~i~)_**
+
+In this formula, the _sd(T)_ function refers to the standard deviation of the values in set _T_, while _T~1~, T~2~, $\ldots$, T~n~_ are the sets of values resulting from a split on a feature.  The _|T|_ term refers to the number of observations in set _T_.  Essentially, the formula measures the reduction in standard deviation by comparing the standard deviation pre-split to the weighted standard deviation post-split.
+
+Consider the following case in which a tree is deciding whether or not to perform a split on binary feature A or B.  Using the groups that would result from a proposed split, the SDR for both A and B is computed as follows:
+```{r sdr}
+## Example: Calculating SDR ----
+# set up the data
+tee <- c(1, 1, 1, 2, 2, 3, 4, 5, 5, 6, 6, 7, 7, 7, 7)
+at1 <- c(1, 1, 1, 2, 2, 3, 4, 5, 5)
+at2 <- c(6, 6, 7, 7, 7, 7)
+bt1 <- c(1, 1, 1, 2, 2, 3, 4)
+bt2 <- c(5, 5, 6, 6, 7, 7, 7, 7)
+
+# compute the SDR
+sdr_a <- sd(tee) - (length(at1) / length(tee) * sd(at1) + length(at2) / length(tee) * sd(at2))
+sdr_b <- sd(tee) - (length(bt1) / length(tee) * sd(bt1) + length(bt2) / length(tee) * sd(bt2))
+
+# compare the SDR for each split
+sdr_a
+sdr_b
+```
+
+The SDR for the split on feature A was about 1.2 versus 1.4 for the split on feature B.  Since the standard deviation was reduced more for the split on B, the decision tree would use B first.  It results in slightly more homogeneous sets than with A.
+
+Suppose that the tree stopped growing here using this one and only split.  A regression tree's work is done.  It can make predictions for new examples depending on whether the example's value on feature B places the example into group _T~1~_ or _T~2~_.  If the example ends up in _T~1~_, the model would predict _mean(bt1) = 2_, otherwise it would predict _mean(bt2) = 6.25_.
+
+In contrast, a model tree would go one step further.  Using the seven training examples falling in group _T~1~_ and the eight in _T~2~_, the model tree could build a linear regression model of the outcome versus feature A.  Note that Feature B is of no help in building the regression model because all examples at the leaf have the same value of B - they were placed into _T~1~_ or _T~2~_ according to their value of B.  The model tree can then make predictions for new examples using either of the two linear models.
+
+# Example - estimating the quality of wines with regression trees and model trees
+This case study will use regression trees and model trees to create a system capable of mimicking expert ratings of wine.  Because trees result in a model that is readily understood, this can allow the winemakers to identify the key factors that contribute to better-rated wines.  Perhaps more importantly, the system does not suffer from the human elements of tasting, such as the rater's mood or palate fatigue.
+
+## Step 1 - collecting data
+The data used for this analysis will be based on a white wine dataset of white Vinho Verde wines from Portugal.  The dataset for red wines is included for later analysis.
+
+The white wine data includes information on 11 chemical properties of 4,898 wine samples.  For each wine, a laboratory analysis measured characteristics such as acidity, sugar content, chlorides, sulfur, alcohol, pH, and density.  The samples were then rated in a blind tasting by panels of no less than three judges on a quality scale ranging from zero (very bad) to 10 (excellent).  In the case of judges disagreeing on the rating, the median value was used.
+
+## Step 2 - exploring and preparing the data
+The data is loaded in the typical fashion, however, as all of the features are numeric, ```stringsAsFactors``` need not be specified.
+```{r white_wine}
+wine <- read.csv("whitewines.csv")
+
+str(wine)
+```
+
+Compared with other types of machine learning models, one of the advantages of trees is that they can handle many types of data without preprocessing.  This means that the features do not need to be normalized or standardized.
+
+However, a bit of effort to examine the distribution of the outcome variable is needed to inform the evaluation of the model's performance.  For instance, suppose that there was a very little variation in quality from wine-to-wine, or that wines fell into a bimodal distribution - either very good or very bad.  To check for such extremes, the distribution of quality can be examined with a histogram:
+```{r wine_historgram}
+library(RColorBrewer)
+hist(wine$quality, col=brewer.pal(9, "BrBG"), xlab = "Low -> High", ylab = "", main = "Wine Quality")
+```
+
+The wine quality values appear to follow a fairly normal, bell-shaped distribution. centered around a value of six.  This makes sense intuitively because most wines are of average quality; few are particularly god or good.
+
+The last step is to divide into training and testing data sets.  Since the **wine** dataset was already sorted into random order, it can be partitioned into two sets of contiguous rows as follows:
+```{r wine_splits}
+wine_train <- wine[1:3750, ]
+wine_test <- wine[3751:4898, ]
+```
+
+## Step 3 - training a model on the data
+Training a regression tree model using the ```rpart``` package is the approach which uses the most faithful implementation of regression trees.
+
+**Building the model**
+
+```m <- rpart(dv ~ iv, data = mydata)```
+
+where:
+
+* _dv_ is the dependent variable in the **mydata** data frame to be modeled.
+
+* _iv_ is an $ formula specifying the independent variables in the **mydata** data frame to use in the model
+
+* _data_ specifies the data frame in which the **dv** and **iv** variables can be found
+
+The function  will return a regression tree model object that can be used to make predictions.
+
+**Making predictions**
+
+```p <- predict(m, test, type = "vector")```
+
+where:
+
+* _m_ is a model trained by the **rpart()** function
+
+* _test_ is a data frame containing test data with the same features as the training data used to build the model
+
+*  _type_ specifies the type of prediction to return, either "vector" (for predicted numeric values), "class" for predicted classes, or "prob" (for predicted class probabilities)
+
+The function will return a vector of predictions depending on the **type** parameter.
+
+Using the R formula interface, _quality_ can be specified as the outcome variable and the dot notation allow all the other columns in the **wine_train** data frame to be used as predictors.  The resulting regression tree model object is named ```m.rpart``` to distinguish it from the model tree that will be trained later:
+```{r m_rpart}
+library(rpart)
+m.rpart <- rpart(quality ~ ., data = wine_train)
+```
+
+To get basic information about the tree, just type the name of the model object:
+```{r m_rpart_info}
+m.rpart
+```
+
+For each node in the tree, the number of examples reaching the decision point is listed.  For instance, all 3,750 examples begin at the root node, of which 2,372 have _alcohol < 10.85_ and 1,378 have _alcohol_ >= 10.85.  Because alcohol was used first in the tree, it is the single most important predictor of wine quality.
+
+Nodes indicated by * are terminal or leaf nodes, which means that they result in a prediction (listed here as _yval_).  For example, node 5 has a _yval_ of 5.971091.  When the tree is used for predictions, any wine samples with _alcohol < 10.85_ and _volatile.acidity < 0.2275_ would therefore be predict to have a quality value of 5.97.
+
+A more detailed summary of the tree's fit, including the mean squared error for each of the nodes and an overall measure of feature importance, can be obtained using the ```summary(m.rpart)``` command.
+
+### Visualizing decision trees
+
+Although the tree can be understood using only the preceding output, it is more readily understood using visualization through the ```rpart.plot``` package.
+```{r rpart_model}
+library(rpart.plot)
+rpart.plot(m.rpart, digits = 3)
+```
+
+Using the ```fallen.leaves``` parameter forces the leaf nodes to be aligned at the bottom of the plot, while the ```type``` and ```extra``` parameters affect the way the decisions and nodes are labeled.
+
+```{r m_rpart_tree}
+rpart.plot(m.rpart, digits = 4, fallen.leaves = TRUE, type = 3, extra = 101)
+```
+Visualizations like these may assist with the dissemination of regression tree results.  In both cases, the numbers shown in the leaf nodes are the predicted values for the examples reaching that node.
+
+## Step 4 - evaluating model performance
+
+The ```predict()``` function will use the model tree to make predictions on the test data.  By default, this returns the estimated numeric value for the outcome variable.
+```{r tree_predict}
+p.rpart <- predict(m.rpart, wine_test)
+```
+
+A quick look at the summary statistics of the predictions suggests a potential problem; the predictions fall on a much narrower range than the true values:
+```{r predict_summaries}
+# compare the distribution of predicted values vs. actual values
+summary(p.rpart)
+summary(wine_test$quality)
+```
+
+This finding suggests that the model is not correctly identifying the extreme cases, in particular the best and worst wines.  On the other hand, between the first and third quartile, the model may be doing quite well.
+
+The correlation between the predicted and actual quality values provides a simple way to gauge the model's performance.
+```{r model_cor}
+cor(p.rpart, wine_test$quality)
+```
+
+This correlation value is certainly acceptable.  However, the correlation only measures how strongly the predictions are related to the true value; it is not a measure of how far off the predictions were from the true values.
+
+### Measuring performance with the mean absolute error
+
+Another way to think about the model's performance is to consider how far, on average, its prediction was from the true value.  This measurement is called the **mean absolute error (MAE)**.  The equation for MAE is as follows, where _n_ indicates the number of predictions and _e~i~_ indicates the error for prediction _i_:
+
+**MAE = $\frac{1}{n}\Sigma_{i=1}^n$|_e~i~_|**
+
+As the name implies, this equation takes the mean of the absolute value of the errors.  Since the error is just the difference between the predicted and actual values, a simple MAE() function can be created as follows:
+```{r MAE}
+# function to calculate the mean absolute error
+MAE <- function(actual, predicted) {
+  mean(abs(actual - predicted))  
+}
+```
+
+Using the function to determine the MAE for the predictions:
+```{r MAE_eval}
+# mean absolute error between predicted and actual values
+MAE(p.rpart, wine_test$quality)
+```
+
+This implies that, on average, the difference between the model's predictions and the true quality score was about 0.59.  On a quality scale from zero to 10, this seems to suggest that the model is doing fairly well.
+
+On the other hand, recall that most wines were neither very good nor very bad; the typical quality score was around five to six.  Therefore, a classifier that did nothing but predict the mean value may still do fairly well according to this metric.
+
+The mean quality rating in the training data is as follows:
+```{r mean_training}
+mean_quality <- mean(wine_train$quality) 
+```
+
+If this value was predicted for every wine sample, this would give an MAE of ~0.67:
+```{r}
+round(MAE(mean_quality, wine_test$quality), 2)
+```
+The regression tree value of 0.59 comes closer on average to the true quality score than the imputed mean of 0.67 but not by much.
+
+## Step 5 - improving model performance
+Building a model tree may improve the performance of the learner.  Recall that a model tree improves on regression trees by replacing the leaf nodes with regression models.  This often results in more accurate results than regression trees, which use only a single value for prediction at the leaf nodes.
+
+The current state-of-the-art in model trees is the **M5' algorithm (M5-prime)** and is included in the _RWeka_ package through the _MP5()_ function.
+
+**Building the model**
+
+```m <- M5P(dv ~ iv, data = mydata)```
+
+where:
+
+* _dv_ is the dependent variable in the **mydata** data frame to be modeled
+
+* _iv_ is an R formula specifying the independent variables in the **mydata** data frame to use in the model
+ 
+* _data_ specifies the data frame in which the **dv** and **iv** variables can be found
+
+The function will return a model tree object that can be used to make predictions
+
+**Making Predictions**
+
+```p <- predict(m, test)```
+
+where:
+
+* _m_ is a model trained by the **M5P()** function
+
+* _test_ is a data frame containing test data with the same features as the training data used to build the model
+
+The function will return a vector of predicted numeric values.
+
+**Example:**
+```
+wine_model <- M5P(quality ~ alcohol + sulfates, data = wine_train)
+wine_predictions <- predict(wine_model, wine_test)
+```
+Fit the model tree using essentially the same syntax as was used for the regression tree:
+```{r RWeka}
+library(RWeka)
+m.m5p <- M5P(quality ~ ., data = wine_train)
+```
+
+The tree itself can be examined by typing its name.  As the output is very large, that step is not included here.  Basically, here is the information presented:
+
+* The splits are very similar to the regression tree that was built earlier
+
+* Alcohol is the most important variable, followed by volatile acidity and free sulfur dioxide.  A key difference, however, is that the nodes terminate not in a numeric prediction, but a linear model (shown as _LM1_ and _LM2_)
+
+* The linear models are shown later in the output.  For instance, the model for _LM1_ has values which can be interpreted exactly the same as the multiple regression models built ealier.  Each number is the net effect of the associated feature on the predicted wine quality.  The coefficient of 0.266 for fixed acidity implies that for an increase of 1 unit of acidity, the wine quality is expected to increase by 0.266
+
+* It is important to note that the effects estimated by _LM1_ apply only to wine samples reaching this node; a totla of 36 linear models were built in this model tree, wach with different estimates of the impact of fixed acidity and the other 10 features.
+
+For statistics on how well the model fits the training data, the _summary()_ function can be applied to the M5P model.  However, note that since these statistics are based on the training data, they should be used only as a rough diagnostic:
+```{r m5p_summary}
+summary(m.m5p)
+```
+
+Instead, it is more useful to see how well the model performs on the unseen test data; the _predict()_ function returns a vector of predicted values:
+```{r m5p_predict}
+p.m5p <- predict(m.m5p, wine_test)
+```
+
+The model tree appears to be predicting a wider range of values than the regression tree:
+```{r summary_m5p_predict}
+summary(p.m5p)
+```
+
+And the correlation also seems to be substantially higher:
+
+
+
+The correlation also seems to be substantially higher:
+```{r predict_correlation}
+cor(p.m5p, wine_test$quality)
+```
+
+Furthermore, the model has slightly reduced the mean absolute error:
+```{r m5p_mae}
+# mean absolute error of predicted and true values
+# (uses a custom function defined above)
+MAE(wine_test$quality, p.m5p)
+```
 
 
 
